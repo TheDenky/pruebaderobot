@@ -1,0 +1,615 @@
+"""
+SERVICES ULTRA MEJORADO - Lógica de negocio con IA
+Sistema inteligente con reintentos, validación por IA y mejor interacción
+"""
+import time
+from typing import Optional, List
+from datetime import datetime
+from models import Persona, Ejercicio, Sesion, ResultadoEjercicio, NivelTerapia
+from database import Database
+
+# Importar el nuevo sistema
+from chatopenai import (
+    consultar, validar_si_no, validar_nombre, validar_edad,
+    comparar_palabras, detectar_salir, feedback_motivador
+)
+from sistema_reintentos import (
+    preguntar_con_reintentos, escuchar_con_reintentos,
+    confirmar_con_usuario, pedir_nombre_con_reintentos,
+    pedir_edad_con_reintentos, evaluacion_ejercicio_con_ia,
+    manejar_frustracion, ConfigReintentos
+)
+
+
+class Config:
+    """Configuración simplificada"""
+    MIN_AGE = 1
+    MAX_AGE = 18
+    RECORDING_DURATION = 5
+    LEVEL_UP_THRESHOLD = 0.80
+
+
+class RobotServiceUltraMejorado:
+    """Servicio principal del robot con IA y reintentos inteligentes"""
+    
+    def __init__(self, db: Database, audio):
+        self.db = db
+        self.audio = audio
+        self.interfaz = None
+        self.estrellas_sesion = 0
+        print("✅ RobotService inicializado con IA")
+    
+    # ========== RF1: EVALUACIÓN INICIAL ==========
+    
+    def preguntar_primera_vez(self) -> bool:
+        """Pregunta si es la primera vez que asiste (CON REINTENTOS)"""
+        print("\n🎯 Preguntando si es primera vez...")
+        
+        def validador(respuesta: str):
+            return validar_si_no(respuesta)
+        
+        if self.interfaz:
+            self.interfaz.actualizar_estado("❓ ¿Es tu primera vez?")
+        
+        exito, resultado = preguntar_con_reintentos(
+            audio_system=self.audio,
+            pregunta="¿Es la primera vez que vienes?",
+            validador=validador,
+            mensajes_reintento=[
+                "¿Es tu primera vez aquí? Di sí o no.",
+                "¿Primera vez? Sí o no.",
+                "Dime solo: sí o no."
+            ],
+            max_intentos=3,
+            permitir_salir=False,  # No puede salir durante identificación
+            interfaz=self.interfaz
+        )
+        
+        if not exito:
+            # Si no logró responder, asumir que es primera vez
+            print("⚠️ No se pudo determinar. Asumiendo primera vez.")
+            return True
+        
+        es_primera = (resultado == 'si')
+        print(f"✅ Es primera vez: {es_primera}")
+        return es_primera
+    
+    def registrar_nuevo_usuario(self) -> Optional[Persona]:
+        """RF1.1: Registrar nuevo niño (CON IA Y REINTENTOS)"""
+        print("\n📝 === REGISTRO NUEVO USUARIO ===")
+        
+        # Saludo personalizado con IA
+        if self.interfaz:
+            self.interfaz.actualizar_estado("🤖 Registro nuevo usuario")
+            self.interfaz.robot_hablando(True)
+        
+        saludo = consultar("Di un saludo corto para un niño nuevo que viene a terapia de habla")
+        self.audio.hablar(saludo)
+        
+        if self.interfaz:
+            self.interfaz.robot_hablando(False)
+        
+        time.sleep(1)
+        
+        # === NOMBRE ===
+        if self.interfaz:
+            self.interfaz.actualizar_estado("🎤 Escuchando tu nombre...")
+        
+        nombre = pedir_nombre_con_reintentos(
+            audio_system=self.audio,
+            interfaz=self.interfaz
+        )
+        
+        if not nombre:
+            if self.interfaz:
+                self.interfaz.robot_hablando(True)
+            
+            self.audio.hablar("Lo siento, no pude entender tu nombre. Vamos a intentarlo después.")
+            
+            if self.interfaz:
+                self.interfaz.robot_hablando(False)
+            
+            return None
+        
+        print(f"✅ Nombre obtenido: {nombre}")
+        
+        if self.interfaz:
+            self.interfaz.actualizar_texto_escuchado(f"Nombre: {nombre}")
+            self.interfaz.robot_hablando(True)
+        
+        self.audio.hablar(f"Mucho gusto, {nombre}.")
+        
+        if self.interfaz:
+            self.interfaz.robot_hablando(False)
+        
+        time.sleep(0.5)
+        
+        # === APELLIDO ===
+        if self.interfaz:
+            self.interfaz.actualizar_estado("🎤 Escuchando tu apellido...")
+        
+        def validador_apellido(respuesta: str):
+            es_valido, apellido = validar_nombre(respuesta)
+            return es_valido, apellido
+        
+        exito, apellido = preguntar_con_reintentos(
+            audio_system=self.audio,
+            pregunta="¿Cuál es tu apellido?",
+            validador=validador_apellido,
+            mensajes_reintento=[
+                "No entendí tu apellido. ¿Cuál es?",
+                "Tu apellido, por favor.",
+                "Dime tu apellido una vez más."
+            ],
+            max_intentos=3,
+            permitir_salir=False,
+            interfaz=self.interfaz
+        )
+        
+        if not exito or not apellido:
+            apellido = ""  # Continuar solo con nombre
+            print("⚠️ No se obtuvo apellido, usando solo nombre")
+        else:
+            print(f"✅ Apellido obtenido: {apellido}")
+        
+        nombre_completo = f"{nombre} {apellido}".strip()
+        
+        if self.interfaz:
+            self.interfaz.actualizar_texto_escuchado(f"Nombre completo: {nombre_completo}")
+        
+        # === EDAD ===
+        if self.interfaz:
+            self.interfaz.actualizar_estado("🎤 Escuchando tu edad...")
+        
+        edad = pedir_edad_con_reintentos(
+            audio_system=self.audio,
+            interfaz=self.interfaz
+        )
+        
+        if not edad:
+            if self.interfaz:
+                self.interfaz.robot_hablando(True)
+            
+            self.audio.hablar("No pude entender tu edad. Pero está bien, sigamos.")
+            
+            if self.interfaz:
+                self.interfaz.robot_hablando(False)
+            
+            return None
+        
+        print(f"✅ Edad obtenida: {edad} años")
+        
+        if self.interfaz:
+            self.interfaz.actualizar_texto_escuchado(f"Edad: {edad} años")
+        
+        # === CONFIRMACIÓN ===
+        if self.interfaz:
+            self.interfaz.actualizar_estado("✓ Confirmando datos...")
+            self.interfaz.actualizar_texto_escuchado(f"{nombre_completo}, {edad} años")
+        
+        confirmado = confirmar_con_usuario(
+            audio_system=self.audio,
+            mensaje_confirmacion=f"Tu nombre es {nombre_completo}, tienes {edad} años. ¿Es correcto?",
+            interfaz=self.interfaz
+        )
+        
+        if not confirmado:
+            if self.interfaz:
+                self.interfaz.robot_hablando(True)
+            
+            self.audio.hablar("Está bien. Podemos intentar de nuevo después.")
+            
+            if self.interfaz:
+                self.interfaz.robot_hablando(False)
+            
+            return None
+        
+        # === GUARDAR EN BASE DE DATOS ===
+        if self.interfaz:
+            self.interfaz.actualizar_estado("💾 Guardando datos...")
+            self.interfaz.robot_hablando(True)
+        
+        self.audio.hablar("Perfecto. Guardando tus datos.")
+        
+        if self.interfaz:
+            self.interfaz.robot_hablando(False)
+        
+        persona = Persona(name=nombre_completo, age=edad)
+        person_id = self.db.crear_persona(persona)
+        persona.person_id = person_id
+        
+        if person_id:
+            if self.interfaz:
+                self.interfaz.actualizar_estado("✅ Datos guardados")
+                self.interfaz.actualizar_usuario(nombre_completo)
+                self.interfaz.robot_hablando(True)
+            
+            mensaje_exito = feedback_motivador("exito")
+            self.audio.hablar(mensaje_exito)
+            
+            if self.interfaz:
+                self.interfaz.robot_hablando(False)
+            
+            print(f"✅ Usuario registrado con ID: {person_id}\n")
+            return persona
+        else:
+            self.audio.hablar("Hubo un error al guardar. Pero puedes continuar.")
+            return None
+    
+    def realizar_test_diagnostico(self, persona: Persona) -> NivelTerapia:
+        """RF1.2 y RF1.3: Test diagnóstico con IA"""
+        print("\n🎯 === TEST DIAGNÓSTICO ===")
+        
+        if self.interfaz:
+            self.interfaz.actualizar_estado("🎯 Test inicial...")
+            self.interfaz.robot_hablando(True)
+        
+        self.audio.hablar(f"Hola {persona.name}. Vamos a hacer un pequeño test para conocerte mejor.")
+        
+        if self.interfaz:
+            self.interfaz.robot_hablando(False)
+        
+        time.sleep(1)
+        
+        # Test simplificado (3 palabras)
+        preguntas_test = [
+            ("Di la palabra: CASA", "casa"),
+            ("Di la palabra: PELOTA", "pelota"),
+            ("Di la palabra: MARIPOSA", "mariposa")
+        ]
+        
+        aciertos = 0
+        total = len(preguntas_test)
+        
+        for i, (pregunta, palabra_esperada) in enumerate(preguntas_test, 1):
+            print(f"\n--- Test {i}/{total}: {palabra_esperada.upper()} ---")
+            
+            if self.interfaz:
+                self.interfaz.actualizar_estado(f"🎯 Test {i}/{total}")
+                self.interfaz.mostrar_ejercicio(palabra_esperada.upper())
+                self.interfaz.robot_hablando(True)
+            
+            self.audio.hablar(pregunta)
+            
+            if self.interfaz:
+                self.interfaz.robot_hablando(False)
+            
+            # Evaluar con IA
+            correcto, respuesta, feedback_ia = evaluacion_ejercicio_con_ia(
+                audio_system=self.audio,
+                palabra_esperada=palabra_esperada,
+                interfaz=self.interfaz,
+                max_intentos=2
+            )
+            
+            if correcto:
+                aciertos += 1
+                if self.interfaz:
+                    self.interfaz.celebrar_exito()
+            else:
+                if self.interfaz:
+                    self.interfaz.mostrar_error()
+            
+            # Dar feedback
+            if self.interfaz:
+                self.interfaz.robot_hablando(True)
+            
+            self.audio.hablar(feedback_ia)
+            
+            if self.interfaz:
+                self.interfaz.robot_hablando(False)
+            
+            time.sleep(1)
+        
+        if self.interfaz:
+            self.interfaz.limpiar_ejercicio()
+        
+        # RF1.3: Clasificación en nivel terapéutico
+        tasa_exito = aciertos / total
+        print(f"\n📊 Resultado test: {aciertos}/{total} ({tasa_exito*100:.0f}%)")
+        
+        if tasa_exito >= 0.8:
+            nivel = NivelTerapia.INTERMEDIO
+        elif tasa_exito >= 0.5:
+            nivel = NivelTerapia.BASICO
+        else:
+            nivel = NivelTerapia.INICIAL
+        
+        # RF1.4: Almacenar nivel en perfil
+        self.db.actualizar_nivel_persona(persona.person_id, nivel)
+        persona.nivel_actual = nivel
+        
+        if self.interfaz:
+            self.interfaz.actualizar_estado(f"📊 Nivel: {nivel.name}")
+            self.interfaz.robot_hablando(True)
+        
+        self.audio.hablar(f"Muy bien. Tu nivel es: {nivel.name}")
+        
+        if self.interfaz:
+            self.interfaz.robot_hablando(False)
+        
+        print(f"✅ Nivel asignado: {nivel.name}\n")
+        return nivel
+    
+    # ========== RF3: RECONOCIMIENTO DE USUARIO ==========
+    
+    def buscar_usuario_existente(self) -> Optional[Persona]:
+        """RF3.1: Identificar al niño (CON IA Y REINTENTOS)"""
+        print("\n🔍 === BÚSQUEDA DE USUARIO ===")
+        
+        if self.interfaz:
+            self.interfaz.actualizar_estado("🎤 ¿Cuál es tu nombre?")
+        
+        nombre = pedir_nombre_con_reintentos(
+            audio_system=self.audio,
+            interfaz=self.interfaz
+        )
+        
+        if not nombre:
+            self.audio.hablar("No pude entender tu nombre.")
+            return None
+        
+        print(f"🔍 Buscando: {nombre}")
+        
+        if self.interfaz:
+            self.interfaz.actualizar_texto_escuchado(f"Buscando: {nombre}")
+            self.interfaz.actualizar_estado("🔍 Buscando en base de datos...")
+        
+        # Buscar en base de datos
+        persona = self.db.buscar_persona_por_nombre(nombre)
+        
+        if persona:
+            # RF3.2 y RF3.3: Recuperar progreso
+            ultima_sesion = self.db.obtener_ultima_sesion(persona.person_id)
+            if ultima_sesion:
+                persona.nivel_actual = ultima_sesion.nivel
+            
+            if self.interfaz:
+                self.interfaz.actualizar_estado(f"✅ ¡Te encontré!")
+                self.interfaz.actualizar_usuario(persona.name)
+                self.interfaz.robot_hablando(True)
+            
+            # Saludo personalizado con IA
+            saludo = consultar(
+                f"Di un saludo corto de bienvenida para {persona.name}, un niño que regresa a terapia",
+                contexto=f"El niño está en nivel {persona.nivel_actual.name}"
+            )
+            self.audio.hablar(saludo)
+            
+            if self.interfaz:
+                self.interfaz.robot_hablando(False)
+            
+            print(f"✅ Usuario encontrado: {persona.name} - Nivel {persona.nivel_actual.name}\n")
+            return persona
+        else:
+            if self.interfaz:
+                self.interfaz.actualizar_estado("❌ No te encontré")
+                self.interfaz.robot_hablando(True)
+            
+            self.audio.hablar("No te encontré en mi memoria. Vamos a registrarte.")
+            
+            if self.interfaz:
+                self.interfaz.robot_hablando(False)
+            
+            print("❌ Usuario no encontrado\n")
+            return None
+    
+    # ========== RF2: ASIGNACIÓN Y EJECUCIÓN DE TERAPIAS ==========
+    
+    def realizar_sesion_ejercicios(self, persona: Persona):
+        """RF2: Sesión completa con IA y reintentos"""
+        print("\n🎯 === SESIÓN DE EJERCICIOS ===")
+        
+        if self.interfaz:
+            self.interfaz.actualizar_estado("🎯 Iniciando ejercicios")
+            self.interfaz.robot_hablando(True)
+            self.interfaz.estrellas.reset()
+        
+        intro = consultar(
+            "Di una frase muy corta motivando a un niño a hacer ejercicios de habla",
+            contexto="Debe ser entusiasta y positivo"
+        )
+        self.audio.hablar(intro)
+        
+        if self.interfaz:
+            self.interfaz.robot_hablando(False)
+        
+        time.sleep(1)
+        
+        # RF2.1: Obtener ejercicios del nivel
+        ejercicios = self.db.obtener_ejercicios_por_nivel(persona.nivel_actual)
+        
+        if not ejercicios:
+            print("⚠️ No hay ejercicios para este nivel, usando todos")
+            ejercicios = self.db.obtener_todos_ejercicios()
+            if not ejercicios:
+                self.audio.hablar("No hay ejercicios disponibles ahora.")
+                return
+        
+        print(f"📋 Total ejercicios: {len(ejercicios)}")
+        
+        # Actualizar progreso inicial
+        if self.interfaz:
+            self.interfaz.actualizar_progreso(0, len(ejercicios))
+        
+        # Crear sesión
+        sesion = Sesion(
+            person_id=persona.person_id,
+            nivel=persona.nivel_actual,
+            fecha=datetime.now(),
+            ejercicios_completados=[]
+        )
+        
+        self.estrellas_sesion = 0
+        
+        # Ejecutar cada ejercicio
+        for i, ejercicio in enumerate(ejercicios, 1):
+            print(f"\n{'='*60}")
+            print(f"Ejercicio {i}/{len(ejercicios)}: {ejercicio.word}")
+            print('='*60)
+            
+            # Verificar si quiere continuar
+            if not manejar_frustracion(self.audio, sesion, self.interfaz):
+                print("ℹ️ Sesión terminada por el usuario")
+                break
+            
+            # Ejecutar ejercicio
+            resultado = self._ejecutar_ejercicio_con_ia(
+                ejercicio, persona, i, len(ejercicios)
+            )
+            
+            if resultado:  # Si se obtuvo resultado (no canceló)
+                sesion.ejercicios_completados.append(resultado)
+                
+                # Actualizar progreso
+                if self.interfaz:
+                    self.interfaz.actualizar_progreso(i, len(ejercicios))
+            else:
+                # El usuario quiso salir
+                print("ℹ️ Usuario decidió terminar")
+                break
+            
+            time.sleep(0.5)
+        
+        # Limpiar pantalla
+        if self.interfaz:
+            self.interfaz.limpiar_ejercicio()
+            self.interfaz.actualizar_estado(
+                f"✅ Completado: {sesion.ejercicios_correctos}/{sesion.total_ejercicios}"
+            )
+        
+        # RF4.1: Registrar sesión
+        if sesion.total_ejercicios > 0:
+            sesion_id = self.db.crear_sesion(sesion)
+            sesion.sesion_id = sesion_id
+            
+            # RF4.3: Evaluar progreso
+            self._evaluar_progreso_con_ia(persona, sesion)
+        
+        print(f"\n{'='*60}")
+        print(f"✅ Sesión finalizada")
+        print(f"📊 Correctos: {sesion.ejercicios_correctos}/{sesion.total_ejercicios}")
+        print(f"📈 Tasa éxito: {sesion.tasa_exito*100:.1f}%")
+        print(f"⭐ Estrellas: {self.estrellas_sesion}")
+        print('='*60 + "\n")
+    
+    def _ejecutar_ejercicio_con_ia(
+        self, ejercicio: Ejercicio, persona: Persona, 
+        num: int, total: int
+    ) -> Optional[ResultadoEjercicio]:
+        """Ejecutar ejercicio individual con IA"""
+        
+        # Mostrar en pantalla
+        if self.interfaz:
+            self.interfaz.limpiar_ejercicio()
+            time.sleep(0.3)
+            self.interfaz.mostrar_ejercicio(ejercicio.word)
+            self.interfaz.actualizar_estado(f"🎯 Ejercicio {num}/{total}")
+        
+        # Instrucción
+        if self.interfaz:
+            self.interfaz.robot_hablando(True)
+        
+        self.audio.hablar(f"Repite: {ejercicio.word}")
+        
+        if self.interfaz:
+            self.interfaz.robot_hablando(False)
+        
+        time.sleep(0.5)
+        
+        # Evaluar con IA y reintentos
+        inicio = time.time()
+        correcto, respuesta, feedback_ia = evaluacion_ejercicio_con_ia(
+            audio_system=self.audio,
+            palabra_esperada=ejercicio.word,
+            interfaz=self.interfaz,
+            max_intentos=2
+        )
+        tiempo_respuesta = time.time() - inicio
+        
+        # Actualizar interfaz
+        if respuesta:
+            if self.interfaz:
+                self.interfaz.actualizar_texto_escuchado(f"Dijiste: {respuesta}")
+            print(f"📢 Respuesta: '{respuesta}'")
+        else:
+            if self.interfaz:
+                self.interfaz.actualizar_texto_escuchado("(No se detectó)")
+            print("📢 Sin respuesta")
+        
+        # Feedback visual y verbal
+        if correcto:
+            if self.interfaz:
+                self.interfaz.celebrar_exito()
+            self.estrellas_sesion += 1
+        else:
+            if self.interfaz:
+                self.interfaz.mostrar_error()
+        
+        # Dar feedback de IA
+        if self.interfaz:
+            self.interfaz.robot_hablando(True)
+        
+        self.audio.hablar(feedback_ia)
+        
+        if self.interfaz:
+            self.interfaz.robot_hablando(False)
+        
+        time.sleep(0.5)
+        
+        # Crear resultado
+        return ResultadoEjercicio(
+            ejercicio_id=ejercicio.exercise_id,
+            respuesta=respuesta or "",
+            correcto=correcto,
+            tiempo_respuesta=tiempo_respuesta,
+            intentos=1
+        )
+    
+    def _evaluar_progreso_con_ia(self, persona: Persona, sesion: Sesion):
+        """RF4.3 y RF4.4: Evaluar progreso con celebración"""
+        
+        if not sesion.fue_exitosa():
+            print("ℹ️ Sesión no alcanzó umbral de éxito")
+            return
+        
+        if not persona.puede_subir_nivel(sesion.tasa_exito):
+            print("ℹ️ No alcanzó umbral para subir de nivel")
+            return
+        
+        # Subir de nivel
+        niveles = list(NivelTerapia)
+        indice_actual = niveles.index(persona.nivel_actual)
+        
+        if indice_actual < len(niveles) - 1:
+            nuevo_nivel = niveles[indice_actual + 1]
+            
+            # RF4.4: Actualizar nivel
+            self.db.actualizar_nivel_persona(persona.person_id, nuevo_nivel)
+            persona.nivel_actual = nuevo_nivel
+            
+            # Celebración especial
+            if self.interfaz:
+                self.interfaz.actualizar_estado("🎉 ¡SUBISTE DE NIVEL!")
+                self.interfaz.robot_hablando(True)
+            
+            # Mensaje personalizado con IA
+            mensaje = consultar(
+                f"Celebra que {persona.name} subió al nivel {nuevo_nivel.name}",
+                contexto="Debe ser muy motivador y celebratorio"
+            )
+            self.audio.hablar(mensaje)
+            
+            if self.interfaz:
+                self.interfaz.robot_hablando(False)
+                # Estrellas bonus
+                for _ in range(3):
+                    self.interfaz.estrellas.agregar_estrella()
+                    time.sleep(0.2)
+            
+            print(f"🎉 ¡SUBIÓ DE NIVEL! → {nuevo_nivel.name}")
+            time.sleep(2)
+
+
+# Alias para compatibilidad
+RobotService = RobotServiceUltraMejorado
