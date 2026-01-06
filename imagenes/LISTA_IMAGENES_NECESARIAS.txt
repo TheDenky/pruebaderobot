@@ -1,0 +1,130 @@
+====================================================================
+📸 LISTA DE IMÁGENES NECESARIAS PARA EL ROBOT DODO
+====================================================================
+
+Todas las imágenes deben ser:
+- Formato: PNG o JPG
+- Tamaño recomendado: 400x400 píxeles
+- Estilo: Dibujos infantiles coloridos y simples
+- Fondo: Preferiblemente transparente (PNG) o blanco
+
+Guardar en carpeta: imagenes/
+
+====================================================================
+🎯 NIVEL 1 - INICIAL (8 imágenes + 5 vocales)
+====================================================================
+
+VOCALES (texto grande con colores):
+□ A.png - Letra A grande y colorida
+□ E.png - Letra E grande y colorida
+□ I.png - Letra I grande y colorida
+□ O.png - Letra O grande y colorida
+□ U.png - Letra U grande y colorida
+
+PALABRAS:
+□ MAMA.png - Dibujo de una mamá/madre con niño
+□ PAPA.png - Dibujo de un papá/padre con niño
+□ BEBE.png - Dibujo de un bebé
+
+====================================================================
+🎯 NIVEL 2 - BASICO (10 imágenes)
+====================================================================
+
+□ BOCA.png - Boca sonriente
+□ MANO.png - Mano abierta mostrando los dedos
+□ PATO.png - Pato amarillo
+□ MESA.png - Mesa de madera
+□ BOLA.png - Pelota/bola de colores
+□ POMO.png - Botella o pomo
+□ BOTE.png - Bote/barco en el agua
+□ MIMO.png - Mimo con cara pintada
+□ PIPA.png - Pipa para fumar (estilo caricatura)
+□ MAPA.png - Mapa del mundo o mapa del tesoro
+
+====================================================================
+🎯 NIVEL 3 - INTERMEDIO (12 imágenes)
+====================================================================
+
+□ CASA.png - Casa con techo rojo y puerta
+□ GATO.png - Gato sentado
+□ DADO.png - Dado con puntos
+□ TAZA.png - Taza de té o café
+□ DEDO.png - Dedo índice señalando
+□ CAMA.png - Cama con almohada y sábanas
+□ GOMA.png - Goma de borrar
+□ TODO.png - Concepto visual (checklist completo o círculo lleno)
+□ QUESO.png - Queso amarillo con agujeros
+□ NIDO.png - Nido de pájaro con huevos
+□ SOPA.png - Plato de sopa caliente
+□ LUNA.png - Luna en el cielo nocturno
+
+====================================================================
+🎯 NIVEL 4 - AVANZADO (8 palabras + 7 frases = 15 imágenes)
+====================================================================
+
+PALABRAS:
+□ LORO.png - Loro/papagayo colorido
+□ ROSA.png - Flor rosa
+□ PERRO.png - Perro sentado
+□ CARRO.png - Carro/auto
+□ RORRO.png - Bebé durmiendo (similar a BEBE pero durmiendo)
+□ LAPIZ.png - Lápiz de escribir
+□ LAMPARA.png - Lámpara de mesa
+□ GUITARRA.png - Guitarra
+
+FRASES (compuestas):
+□ MI_MAMA.png - Niño señalándose + madre (o usar MAMA.png)
+□ MI_PAPA.png - Niño señalándose + padre (o usar PAPA.png)
+□ LA_CASA.png - Casa destacada (o usar CASA.png)
+□ EL_GATO.png - Gato destacado (o usar GATO.png)
+□ YO_COMO_PAN.png - Niño comiendo pan
+□ ME_GUSTA_JUGAR.png - Niño jugando feliz
+□ MAMA_ESTA_AQUI.png - Madre con brazos abiertos
+
+====================================================================
+📊 RESUMEN
+====================================================================
+
+Total de imágenes necesarias: 50 imágenes
+
+Distribución:
+- Nivel 1: 8 imágenes (5 vocales + 3 palabras)
+- Nivel 2: 10 imágenes
+- Nivel 3: 12 imágenes
+- Nivel 4: 15 imágenes (8 palabras + 7 frases)
+- EXTRA: 5 imágenes genéricas (opcional)
+
+====================================================================
+🎨 IMÁGENES EXTRAS OPCIONALES (para mejorar la experiencia)
+====================================================================
+
+□ robot_feliz.png - Avatar del robot DODO sonriente
+□ robot_neutral.png - Avatar neutral
+□ robot_triste.png - Avatar triste
+□ estrella.png - Estrella dorada
+□ trofeo.png - Trofeo de ganador
+
+====================================================================
+💡 FUENTES RECOMENDADAS PARA DESCARGAR IMÁGENES GRATUITAS
+====================================================================
+
+1. Freepik (https://www.freepik.com) - Buscar "cartoon [palabra] kids"
+2. Flaticon (https://www.flaticon.com) - Íconos simples
+3. Pixabay (https://pixabay.com) - Imágenes gratuitas
+4. Pexels (https://www.pexels.com) - Fotos gratuitas
+5. OpenClipart (https://openclipart.org) - Clipart vectorial gratuito
+
+Búsqueda recomendada: "[palabra] cartoon kids simple illustration"
+
+====================================================================
+📝 NOTAS IMPORTANTES
+====================================================================
+
+- TODAS las imágenes deben tener el mismo estilo visual (consistencia)
+- Usar colores brillantes y alegres
+- Evitar imágenes realistas, preferir dibujos/caricaturas
+- Las imágenes deben ser claras y fáciles de reconocer
+- Sin texto en las imágenes (el texto se mostrará por separado)
+- Formato preferido: PNG con fondo transparente
+
+====================================================================

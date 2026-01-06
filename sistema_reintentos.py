@@ -424,7 +424,7 @@ def manejar_frustracion(
         respuesta = audio_system.escuchar(timeout=10, phrase_time_limit=10)
         
         if respuesta:
-            from chatopenai_mejorado import detectar_salir, validar_si_no
+            from chatopenai import detectar_salir, validar_si_no
             
             if detectar_salir(respuesta):
                 return False

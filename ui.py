@@ -1,12 +1,14 @@
 """
-UI MEJORADA - Interfaz gráfica moderna para niños
-Incluye animaciones, gamificación y diseño atractivo
+UI MEJORADA CON SOPORTE DE IMÁGENES - Interfaz gráfica moderna para niños
+Incluye animaciones, gamificación, diseño atractivo y apoyo visual con imágenes
 """
 import tkinter as tk
 from tkinter import font as tkfont
 from tkinter import ttk
 import math
 import time
+import os
+from PIL import Image, ImageTk
 
 
 class Config:
@@ -31,6 +33,9 @@ class Config:
     WINDOW_HEIGHT = 800
     FUENTE_PRINCIPAL = "Comic Sans MS"
     FUENTE_ALTERNATIVA = "Arial"
+    
+    # Carpeta de imágenes
+    CARPETA_IMAGENES = "imagenes"
 
 
 class AnimatedLabel(tk.Canvas):
@@ -338,7 +343,7 @@ class RobotAvatar(tk.Canvas):
 
 
 class InterfazEjerciciosMejorada:
-    """Interfaz visual mejorada para ejercicios"""
+    """Interfaz visual mejorada para ejercicios CON IMÁGENES"""
     
     def __init__(self):
         self.ventana = None
@@ -348,10 +353,12 @@ class InterfazEjerciciosMejorada:
         self.label_texto_escuchado = None
         self.label_usuario = None
         self.label_ejercicio = None
+        self.label_imagen = None  # Para mostrar imágenes
         self.progress_bar = None
         self.estrellas = None
         self.ejercicios_totales = 0
         self.ejercicios_completados = 0
+        self.imagen_actual = None  # Referencia a la imagen PIL
     
     def crear(self):
         """Crear ventana principal mejorada"""
@@ -456,7 +463,7 @@ class InterfazEjerciciosMejorada:
         )
         self.label_texto_escuchado.pack(pady=10, padx=20)
         
-        # === SECCIÓN PRINCIPAL: Ejercicio ===
+        # === SECCIÓN PRINCIPAL: Ejercicio CON IMAGEN ===
         frame_ejercicio = tk.Frame(
             self.frame_principal, 
             bg=Config.COLOR_MORADO_CLARO,
@@ -465,19 +472,57 @@ class InterfazEjerciciosMejorada:
         )
         frame_ejercicio.pack(fill="both", expand=True, pady=20)
         
-        # Canvas para ejercicio animado
+        # Label para la imagen
+        self.label_imagen = tk.Label(
+            frame_ejercicio,
+            bg=Config.COLOR_MORADO_CLARO
+        )
+        self.label_imagen.pack(pady=20)
+        
+        # Canvas para ejercicio animado (texto)
         self.label_ejercicio = AnimatedLabel(
             frame_ejercicio,
             text="",
-            font_size=96,
+            font_size=72,
             color=Config.COLOR_TEXTO_CLARO,
             bg=Config.COLOR_MORADO_CLARO,
             width=1000,
-            height=250
+            height=150
         )
         self.label_ejercicio.pack(fill="both", expand=True, padx=20, pady=20)
         
         self.ventana.update()
+    
+    def cargar_y_mostrar_imagen(self, ruta_imagen: str):
+        """
+        Carga y muestra una imagen
+        
+        Args:
+            ruta_imagen: Ruta de la imagen (ej: "imagenes/CASA.png")
+        """
+        if not ruta_imagen or not os.path.exists(ruta_imagen):
+            # Limpiar imagen anterior si no existe
+            self.label_imagen.config(image='')
+            self.imagen_actual = None
+            return
+        
+        try:
+            # Cargar imagen con PIL
+            imagen_pil = Image.open(ruta_imagen)
+            
+            # Redimensionar manteniendo aspecto (máximo 300x300)
+            imagen_pil.thumbnail((300, 300), Image.Resampling.LANCZOS)
+            
+            # Convertir a PhotoImage de tkinter
+            self.imagen_actual = ImageTk.PhotoImage(imagen_pil)
+            
+            # Mostrar en el label
+            self.label_imagen.config(image=self.imagen_actual)
+            
+        except Exception as e:
+            print(f"⚠️ Error al cargar imagen {ruta_imagen}: {e}")
+            self.label_imagen.config(image='')
+            self.imagen_actual = None
     
     def actualizar_usuario(self, texto: str):
         """Actualizar información del usuario"""
@@ -497,8 +542,14 @@ class InterfazEjerciciosMejorada:
             self.label_texto_escuchado.config(text=texto if texto else "...")
             self.ventana.update()
     
-    def mostrar_ejercicio(self, palabra: str):
-        """Mostrar palabra del ejercicio con animación"""
+    def mostrar_ejercicio(self, palabra: str, ruta_imagen: str = None):
+        """
+        Mostrar palabra del ejercicio con animación E IMAGEN
+        
+        Args:
+            palabra: Palabra a mostrar
+            ruta_imagen: Ruta opcional de la imagen de apoyo
+        """
         if self.label_ejercicio:
             self.label_ejercicio.actualizar_texto(palabra.upper(), Config.COLOR_TEXTO_CLARO)
             self.label_ejercicio.animar_pulso(veces=2)
@@ -506,11 +557,26 @@ class InterfazEjerciciosMejorada:
             # Cambiar robot a estado neutral
             if self.robot_avatar:
                 self.robot_avatar.cambiar_estado("neutral")
+        
+        # Mostrar imagen si está disponible
+        if ruta_imagen:
+            self.cargar_y_mostrar_imagen(ruta_imagen)
+        else:
+            # Limpiar imagen anterior
+            if self.label_imagen:
+                self.label_imagen.config(image='')
+                self.imagen_actual = None
     
     def limpiar_ejercicio(self):
         """Limpiar pantalla de ejercicio"""
         if self.label_ejercicio:
             self.label_ejercicio.actualizar_texto("")
+            self.ventana.update()
+        
+        # Limpiar imagen también
+        if self.label_imagen:
+            self.label_imagen.config(image='')
+            self.imagen_actual = None
             self.ventana.update()
     
     def celebrar_exito(self):

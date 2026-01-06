@@ -52,7 +52,7 @@ class AudioSystem:
         self.sounddevice_disponible = self._verificar_sounddevice()
         
         # Intentar cargar ElevenLabs primero (mejor calidad)
-        self._inicializar_elevenlabs()
+        #self._inicializar_elevenlabs()
         self._inicializar_gtts_mpg123()
         
         # Verificar sox para control de velocidad

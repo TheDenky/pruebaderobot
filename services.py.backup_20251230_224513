@@ -1,7 +1,6 @@
 """
 SERVICES ULTRA MEJORADO - Lógica de negocio con IA
 Sistema inteligente con reintentos, validación por IA y mejor interacción
-ACTUALIZADO: Soporte completo de imágenes
 """
 import time
 from typing import Optional, List
@@ -267,13 +266,7 @@ class RobotServiceUltraMejorado:
             
             if self.interfaz:
                 self.interfaz.actualizar_estado(f"🎯 Test {i}/{total}")
-                
-                # ACTUALIZADO: Mostrar palabra sin imagen en test diagnóstico
-                self.interfaz.mostrar_ejercicio(
-                    palabra=palabra_esperada.upper(),
-                    ruta_imagen=None  # Test diagnóstico sin imagen
-                )
-                
+                self.interfaz.mostrar_ejercicio(palabra_esperada.upper())
                 self.interfaz.robot_hablando(True)
             
             self.audio.hablar(pregunta)
@@ -460,7 +453,7 @@ class RobotServiceUltraMejorado:
                 print("ℹ️ Sesión terminada por el usuario")
                 break
             
-            # Ejecutar ejercicio CON IMAGEN
+            # Ejecutar ejercicio
             resultado = self._ejecutar_ejercicio_con_ia(
                 ejercicio, persona, i, len(ejercicios)
             )
@@ -501,26 +494,21 @@ class RobotServiceUltraMejorado:
         print('='*60 + "\n")
     
     def _ejecutar_ejercicio_con_ia(
-        self, ejercicio: Ejercicio, persona: Persona, 
-        num: int, total: int
-    ) -> Optional[ResultadoEjercicio]:
-        """
-        Ejecutar ejercicio individual con IA E IMAGEN
-        ACTUALIZADO: Ahora pasa la ruta de la imagen a la interfaz
-        """
-        
-        # Mostrar en pantalla CON IMAGEN
+    self, ejercicio: Ejercicio, persona: Persona, 
+    num: int, total: int) -> Optional[ResultadoEjercicio]:
+    #"""Ejecutar ejercicio individual con IA E IMAGEN"""
+    
+    # Mostrar en pantalla CON IMAGEN
         if self.interfaz:
             self.interfaz.limpiar_ejercicio()
             time.sleep(0.3)
             
-            # NUEVO: Obtener ruta de imagen si está disponible
+            # NUEVO: Pasar la ruta de la imagen si está disponible
             ruta_imagen = ejercicio.apoyo_visual if ejercicio.apoyo_visual else None
             
-            # NUEVO: Pasar la imagen al mostrar ejercicio
             self.interfaz.mostrar_ejercicio(
                 palabra=ejercicio.word,
-                ruta_imagen=ruta_imagen
+                ruta_imagen=ruta_imagen  # NUEVO parámetro
             )
             
             self.interfaz.actualizar_estado(f"🎯 Ejercicio {num}/{total}")
