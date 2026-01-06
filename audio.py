@@ -1,6 +1,7 @@
 """
-AUDIO MODIFICADO - Con notificaciones a la interfaz
+AUDIO MODIFICADO - Con notificaciones a la interfaz y grabación organizada por usuario
 Notifica cuando empieza y termina de hablar para mostrar eyes.gif
+Graba audios organizados por carpeta de usuario con formato específico
 """
 import os
 import sys
@@ -22,7 +23,7 @@ from dotenv import load_dotenv
 
 
 class AudioSystemConInterfaz:
-    """Sistema de audio que notifica a la interfaz cuando habla"""
+    """Sistema de audio que notifica a la interfaz cuando habla y graba de forma organizada"""
     
     def __init__(self, interfaz=None):
         # Cargar variables de entorno
@@ -58,9 +59,10 @@ class AudioSystemConInterfaz:
         if not self.elevenlabs_disponible and not self.gtts_disponible:
             self._inicializar_espeak()
         
-        # Crear carpeta de audio
+        # Crear carpeta de audio principal
         if not os.path.exists(Config.AUDIO_FOLDER):
             os.makedirs(Config.AUDIO_FOLDER)
+            print(f"✅ Carpeta de audios creada: {Config.AUDIO_FOLDER}")
         
         # Mensaje de estado
         self._mostrar_estado_tts()
@@ -330,23 +332,61 @@ class AudioSystemConInterfaz:
             print(f"⚠️ espeak falló: {e}")
             return False
     
-    # ========== GRABACIÓN ==========
+    # ========== GRABACIÓN MEJORADA ==========
     
-    def grabar(self, duracion: int, person_id: int, exercise_id: int) -> Optional[str]:
-        """Graba audio usando sounddevice"""
+    def grabar(self, duracion: int, person_id: int, exercise_id: int, 
+               ejercicio_nombre: str = None, nivel_actual: str = None, 
+               numero_sesion: int = None) -> Optional[str]:
+        """
+        Graba audio usando sounddevice con estructura organizada por usuario
+        
+        Estructura de carpetas:
+        audio_registros/
+            {person_id}/
+                {nombre_ejercicio}_{nivel_actual}_{numero_sesion}_{fecha}.wav
+        
+        Args:
+            duracion: Duración en segundos
+            person_id: ID del niño
+            exercise_id: ID del ejercicio
+            ejercicio_nombre: Nombre del ejercicio (opcional, para formato mejorado)
+            nivel_actual: Nivel actual del niño (opcional, para formato mejorado)
+            numero_sesion: Número de sesión actual (opcional, para formato mejorado)
+            
+        Returns:
+            Ruta del archivo grabado o None si falla
+        """
         if not self.sounddevice_disponible:
-            print("❌ sounddevice no está disponible")
+            print("❌ sounddevice no está disponible para grabar")
             return None
         
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        nombre_archivo = f"{Config.AUDIO_FOLDER}/audio_{person_id}_{exercise_id}_{timestamp}.wav"
-        
         try:
+            # Crear carpeta del usuario si no existe
+            carpeta_usuario = os.path.join(Config.AUDIO_FOLDER, str(person_id))
+            os.makedirs(carpeta_usuario, exist_ok=True)
+            
+            # Generar nombre del archivo según formato solicitado
+            fecha = datetime.now().strftime('%Y-%m-%d')
+            
+            if ejercicio_nombre and nivel_actual and numero_sesion is not None:
+                # Formato completo: {nombre_ejercicio}_{nivel_actual}_{numero_sesion}_{fecha}.wav
+                nombre_limpio = ejercicio_nombre.replace(' ', '_').replace('/', '_')
+                nivel_limpio = nivel_actual.replace(' ', '_')
+                nombre_archivo = f"{nombre_limpio}_{nivel_limpio}_sesion{numero_sesion}_{fecha}.wav"
+            else:
+                # Formato fallback con timestamp
+                timestamp = datetime.now().strftime('%H%M%S')
+                nombre_archivo = f"ejercicio_{exercise_id}_{fecha}_{timestamp}.wav"
+            
+            ruta_completa = os.path.join(carpeta_usuario, nombre_archivo)
+            
+            # Configuración de grabación
             sample_rate = 44100
             channels = 1
             
-            print(f"🎙️ Grabando {duracion} segundos...")
+            print(f"🎙️ Grabando {duracion} segundos en: {ruta_completa}")
             
+            # Grabar audio
             audio_data = sd.rec(
                 int(duracion * sample_rate),
                 samplerate=sample_rate,
@@ -356,17 +396,27 @@ class AudioSystemConInterfaz:
             
             sd.wait()
             
-            sf.write(nombre_archivo, audio_data, sample_rate)
+            # Guardar archivo
+            sf.write(ruta_completa, audio_data, sample_rate)
             
-            print(f"✅ Audio grabado: {nombre_archivo}")
-            return nombre_archivo
+            print(f"✅ Audio guardado: {nombre_archivo}")
+            return ruta_completa
             
         except Exception as e:
             print(f"⚠️ Error al grabar audio: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
-    def grabar_y_escuchar(self, duracion: int, person_id: int, exercise_id: int) -> tuple:
-        """Graba audio Y reconoce voz simultáneamente"""
+    def grabar_y_escuchar(self, duracion: int, person_id: int, exercise_id: int,
+                          ejercicio_nombre: str = None, nivel_actual: str = None,
+                          numero_sesion: int = None) -> tuple:
+        """
+        Graba audio Y reconoce voz simultáneamente
+        
+        Returns:
+            (texto_reconocido, audio_path)
+        """
         texto_reconocido = None
         audio_path = None
         
@@ -380,7 +430,10 @@ class AudioSystemConInterfaz:
         def grabar_thread():
             nonlocal audio_path
             try:
-                audio_path = self.grabar(duracion, person_id, exercise_id)
+                audio_path = self.grabar(
+                    duracion, person_id, exercise_id,
+                    ejercicio_nombre, nivel_actual, numero_sesion
+                )
             except:
                 pass
         

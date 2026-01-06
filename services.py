@@ -1,6 +1,7 @@
 """
-SERVICES CON INTERFAZ UNIFICADA
+SERVICES CON INTERFAZ UNIFICADA Y GRABACIÓN DE AUDIO
 Usa los diferentes estados de la interfaz según el flujo
+Graba automáticamente los audios de cada ejercicio de forma organizada
 """
 import time
 from typing import Optional, List
@@ -30,14 +31,15 @@ class Config:
 
 
 class RobotServiceInterfazUnificada:
-    """Servicio que usa interfaz unificada"""
+    """Servicio que usa interfaz unificada y graba audios"""
     
     def __init__(self, db: Database, audio):
         self.db = db
         self.audio = audio
         self.interfaz = None
         self.estrellas_sesion = 0
-        print("✅ RobotService inicializado con interfaz unificada")
+        self.numero_sesion_actual = 0
+        print("✅ RobotService inicializado con interfaz unificada y grabación de audio")
     
     def set_interfaz(self, interfaz):
         """Configurar la interfaz unificada"""
@@ -292,8 +294,13 @@ class RobotServiceInterfazUnificada:
     # ========== RF2: ASIGNACIÓN Y EJECUCIÓN DE TERAPIAS ==========
     
     def realizar_sesion_ejercicios(self, persona: Persona):
-        """RF2: Sesión completa - Muestra ejercicios con imágenes"""
+        """RF2: Sesión completa - Muestra ejercicios con imágenes y GRABA AUDIOS"""
         print("\n🎯 === SESIÓN DE EJERCICIOS ===")
+        
+        # Calcular número de sesión
+        sesiones_previas = self.db.obtener_sesiones_por_persona(persona.person_id)
+        self.numero_sesion_actual = len(sesiones_previas) + 1
+        print(f"📊 Sesión número: {self.numero_sesion_actual}")
         
         # Mensaje inicial (mostrará eyes.gif)
         intro = consultar(
@@ -336,8 +343,8 @@ class RobotServiceInterfazUnificada:
                 print("ℹ️ Sesión terminada por el usuario")
                 break
             
-            # Ejecutar ejercicio CON IMAGEN
-            resultado = self._ejecutar_ejercicio_con_ia(
+            # Ejecutar ejercicio CON IMAGEN Y GRABACIÓN DE AUDIO
+            resultado = self._ejecutar_ejercicio_con_ia_y_grabacion(
                 ejercicio, persona, i, len(ejercicios)
             )
             
@@ -366,16 +373,18 @@ class RobotServiceInterfazUnificada:
         print(f"📊 Correctos: {sesion.ejercicios_correctos}/{sesion.total_ejercicios}")
         print(f"📈 Tasa éxito: {sesion.tasa_exito*100:.1f}%")
         print(f"⭐ Estrellas: {self.estrellas_sesion}")
+        print(f"🎙️ Audios grabados en: audio_registros/{persona.person_id}/")
         print('='*60 + "\n")
     
-    def _ejecutar_ejercicio_con_ia(
+    def _ejecutar_ejercicio_con_ia_y_grabacion(
         self, ejercicio: Ejercicio, persona: Persona, 
         num: int, total: int
     ) -> Optional[ResultadoEjercicio]:
         """
-        Ejecutar ejercicio individual
+        Ejecutar ejercicio individual CON GRABACIÓN DE AUDIO
         MUESTRA: imagen + palabra mientras usuario responde
         MUESTRA: eyes.gif cuando robot habla
+        GRABA: audio del usuario con formato organizado
         """
         
         # MOSTRAR EJERCICIO (imagen + palabra)
@@ -399,15 +408,58 @@ class RobotServiceInterfazUnificada:
         
         time.sleep(0.5)
         
-        # Evaluar con IA y reintentos
+        # === GRABAR Y EVALUAR SIMULTÁNEAMENTE ===
         inicio = time.time()
-        correcto, respuesta, feedback_ia = evaluacion_ejercicio_con_ia(
-            audio_system=self.audio,
-            palabra_esperada=ejercicio.word,
-            interfaz=None,
-            max_intentos=2
+        
+        # Preparar parámetros para grabación
+        ejercicio_nombre = ejercicio.word
+        nivel_actual = persona.nivel_actual.name
+        numero_sesion = self.numero_sesion_actual
+        
+        print(f"🎙️ Grabando audio: {ejercicio_nombre}_{nivel_actual}_sesion{numero_sesion}")
+        
+        # Usar grabar_y_escuchar para hacer ambas cosas a la vez
+        respuesta, audio_path = self.audio.grabar_y_escuchar(
+            duracion=Config.RECORDING_DURATION,
+            person_id=persona.person_id,
+            exercise_id=ejercicio.exercise_id,
+            ejercicio_nombre=ejercicio_nombre,
+            nivel_actual=nivel_actual,
+            numero_sesion=numero_sesion
         )
+        
         tiempo_respuesta = time.time() - inicio
+        
+        # Si no obtuvimos texto reconocido, dar otra oportunidad
+        intentos = 1
+        if not respuesta:
+            print("⚠️ Primera grabación sin texto reconocido, dando otra oportunidad...")
+            self.audio.hablar("No te escuché bien. Intenta una vez más.")
+            
+            # Segundo intento
+            respuesta, audio_path_2 = self.audio.grabar_y_escuchar(
+                duracion=Config.RECORDING_DURATION,
+                person_id=persona.person_id,
+                exercise_id=ejercicio.exercise_id,
+                ejercicio_nombre=ejercicio_nombre,
+                nivel_actual=nivel_actual,
+                numero_sesion=numero_sesion
+            )
+            intentos = 2
+            
+            # Usar la ruta del segundo audio si existe
+            if audio_path_2:
+                audio_path = audio_path_2
+        
+        # Evaluar respuesta con IA
+        if respuesta:
+            correcto, confianza, feedback_ia = comparar_palabras(ejercicio.word, respuesta)
+            print(f"📊 Evaluación: correcto={correcto}, confianza={confianza:.2f}")
+            print(f"💬 Feedback IA: {feedback_ia}")
+        else:
+            correcto = False
+            feedback_ia = "No logré escucharte, pero está bien. Sigamos."
+            print("⚠️ No se pudo evaluar (sin texto reconocido)")
         
         # Feedback visual EN EL EJERCICIO
         if self.interfaz:
@@ -420,13 +472,14 @@ class RobotServiceInterfazUnificada:
         self.audio.hablar(feedback_ia)
         time.sleep(0.5)
         
-        # Crear resultado
+        # Crear resultado con la ruta del audio
         return ResultadoEjercicio(
             ejercicio_id=ejercicio.exercise_id,
             respuesta=respuesta or "",
             correcto=correcto,
             tiempo_respuesta=tiempo_respuesta,
-            intentos=1
+            intentos=intentos,
+            audio_path=audio_path  # ¡IMPORTANTE! Guardar la ruta del audio
         )
     
     def _evaluar_progreso_con_ia(self, persona: Persona, sesion: Sesion):
