@@ -1,11 +1,10 @@
 """
-ROBOT DODO - Sistema de Registro y Ejercicios por Voz
-VERSIÓN SIMPLIFICADA - Arquitectura organizada
-
-Punto de entrada principal del sistema
+ROBOT DODO - Versión con Interfaz Unificada
+Una sola ventana que se mantiene abierta durante toda la ejecución
 """
 import sys
 import time
+import threading
 from datetime import datetime
 from chatopenai import consultar
 
@@ -13,13 +12,13 @@ from chatopenai import consultar
 from config import Config
 from database import Database
 from audio import AudioSystem
-from ui import InterfazEjercicios
+from ui import InterfazUnificada
 from services import RobotService
 from utils import imprimir_encabezado, imprimir_seccion
 
 
-class RobotDodo:
-    """Controlador principal del Robot DODO"""
+class RobotDodoUnificado:
+    """Controlador principal con interfaz unificada"""
     
     def __init__(self):
         self.activo = True
@@ -27,6 +26,7 @@ class RobotDodo:
         self.audio = None
         self.service = None
         self.interfaz = None
+        self.hilo_escucha = None
     
     def inicializar(self):
         """Inicializar todos los componentes"""
@@ -37,65 +37,75 @@ class RobotDodo:
         # Crear carpetas necesarias
         Config.crear_carpetas()
         
-        # Base de datos
+        # PASO 1: Crear interfaz PRIMERO
+        print("🖥️  Creando interfaz unificada...")
+        self.interfaz = InterfazUnificada()
+        self.interfaz.crear()
+        # Interfaz empieza mostrando eyes.gif automáticamente
+        
+        # PASO 2: Base de datos
         print("📊 Conectando a base de datos...")
         self.db = Database(Config.DATABASE_PATH)
         
-        # Sistema de audio
+        # PASO 3: Sistema de audio (con referencia a interfaz)
         print("🎤 Inicializando sistema de audio...")
-        self.audio = AudioSystem()
+        self.audio = AudioSystem(interfaz=self.interfaz)
         
-        # Servicio principal
+        # PASO 4: Servicio principal
         print("⚙️ Configurando servicios...")
         self.service = RobotService(self.db, self.audio)
+        self.service.set_interfaz(self.interfaz)
         
         print("\n✅ ROBOT LISTO\n")
         print("="*70 + "\n")
         
-        # Mensaje inicial
+        # Mensaje inicial por voz (mostrará eyes.gif)
         respuesta = consultar("Di un saludo corto que no sea hola, luego indica que si te necesita solo te salude")
-        #print("Asistente:", respuesta)
         self.audio.hablar(respuesta, velocidad=1)
-        #self.audio.hablar("Hola, soy el Robot Dodo.", velocidad=1)
-        #time.sleep(0.5)
-        #self.audio.hablar(f"Estoy esperando que digas {Config.ACTIVATION_WORD} para comenzar.")
         
         imprimir_seccion("ROBOT EN MODO ESCUCHA")
     
     def modo_escucha(self):
-        """Modo de escucha continua esperando palabra de activación"""
+        """Modo de escucha continua en segundo plano"""
         
-        while self.activo:
-            try:
-                hora = datetime.now().strftime('%H:%M:%S')
-                print(f"[{hora}] 👂 Escuchando... (di '{Config.ACTIVATION_WORD}' o 'adiós')")
-                
-                texto = self.audio.escuchar(timeout=Config.AUDIO_TIMEOUT)
-                
-                if texto:
-                    texto_lower = texto.lower()
-                    print(f"[{hora}] 📢 Escuché: '{texto}'")
+        def escucha_continua():
+            """Función que corre en hilo separado"""
+            while self.activo:
+                try:
+                    hora = datetime.now().strftime('%H:%M:%S')
+                    print(f"[{hora}] 👂 Escuchando... (di '{Config.ACTIVATION_WORD}' o 'adiós')")
                     
-                    # Detectar palabras de salida
-                    if any(palabra in texto_lower for palabra in Config.EXIT_WORDS):
-                        print(f"[{hora}] 👋 ¡COMANDO DE SALIDA!\n")
-                        self.apagar()
-                        break
+                    texto = self.audio.escuchar(timeout=Config.AUDIO_TIMEOUT)
                     
-                    # Detectar palabra de activación
-                    elif Config.ACTIVATION_WORD in texto_lower:
-                        print(f"[{hora}] ✅ ¡ROBOT ACTIVADO!\n")
-                        self.modo_activo()
+                    if texto:
+                        texto_lower = texto.lower()
+                        print(f"[{hora}] 📢 Escuché: '{texto}'")
+                        
+                        # Detectar palabras de salida
+                        if any(palabra in texto_lower for palabra in Config.EXIT_WORDS):
+                            print(f"[{hora}] 👋 ¡COMANDO DE SALIDA!\n")
+                            self.apagar()
+                            break
+                        
+                        # Detectar palabra de activación
+                        elif Config.ACTIVATION_WORD in texto_lower:
+                            print(f"[{hora}] ✅ ¡ROBOT ACTIVADO!\n")
+                            # Ejecutar modo activo en el mismo hilo
+                            self.modo_activo()
+                        else:
+                            print(f"[{hora}] ⭕ Esperando '{Config.ACTIVATION_WORD}'...\n")
                     else:
-                        print(f"[{hora}] ⭕ Esperando '{Config.ACTIVATION_WORD}'...\n")
-                else:
-                    print(f"[{hora}] ⏱️ Silencio...\n")
-                
-                time.sleep(0.3)
-                
-            except Exception as e:
-                print(f"\n⚠️ Error en escucha: {e}\n")
-                time.sleep(1)
+                        print(f"[{hora}] ⏱️ Silencio...\n")
+                    
+                    time.sleep(0.3)
+                    
+                except Exception as e:
+                    print(f"\n⚠️ Error en escucha: {e}\n")
+                    time.sleep(1)
+        
+        # Iniciar escucha en hilo separado
+        self.hilo_escucha = threading.Thread(target=escucha_continua, daemon=True)
+        self.hilo_escucha.start()
     
     def modo_activo(self):
         """Modo activo: proceso completo de identificación y ejercicios"""
@@ -104,25 +114,19 @@ class RobotDodo:
         print("║" + " "*25 + "ROBOT ACTIVADO" + " "*29 + "║")
         print("╚" + "═"*68 + "╝\n")
         
-        # Saludo
+        # Saludo (mostrará eyes.gif)
         self.audio.hablar("Hola, aquí estoy.")
         time.sleep(0.5)
         
-        # Crear interfaz de ejercicios
-        self.interfaz = InterfazEjercicios()
-        self.interfaz.crear()
-        self.service.interfaz = self.interfaz
-        time.sleep(0.3)
-        
         try:
-            # PASO 1: Identificación
+            # PASO 1: Identificación (mostrará nombre cuando se obtenga)
             persona = self.identificar_usuario()
             
             if persona:
-                # PASO 2: Ejercicios
+                # PASO 2: Ejercicios (mostrará imágenes + palabras)
                 self.service.realizar_sesion_ejercicios(persona)
                 
-                # PASO 3: Despedida
+                # PASO 3: Despedida (volverá a eyes.gif)
                 self.despedida()
         
         except Exception as e:
@@ -131,10 +135,9 @@ class RobotDodo:
             traceback.print_exc()
         
         finally:
-            # Cerrar interfaz
+            # Volver a eyes.gif
             if self.interfaz:
-                self.interfaz.cerrar()
-                time.sleep(0.5)
+                self.interfaz.mostrar_eyes()
             
             print("\n" + "─"*70)
             print("  Volviendo al modo escucha...")
@@ -147,21 +150,16 @@ class RobotDodo:
         
         imprimir_seccion("IDENTIFICACIÓN DE USUARIO")
         
-        self.interfaz.actualizar_estado("❓ ¿Es tu primera vez?")
-        
-        # Preguntar si es primera vez
+        # Preguntar si es primera vez (mostrará eyes.gif al hablar)
         es_primera_vez = self.service.preguntar_primera_vez()
         
         if es_primera_vez:
             print("➡️ PRIMERA VEZ - Registro nuevo\n")
-            self.interfaz.actualizar_estado("📝 Registro nuevo")
             
-            # RF1.1: Registrar nuevo usuario
+            # RF1.1: Registrar nuevo usuario (mostrará nombre cuando se obtenga)
             persona = self.service.registrar_nuevo_usuario()
             
             if persona:
-                self.interfaz.actualizar_usuario(persona.name)
-                
                 # RF1.2 y RF1.3: Test diagnóstico
                 nivel = self.service.realizar_test_diagnostico(persona)
                 print(f"✅ Usuario registrado - Nivel: {nivel.name}\n")
@@ -169,13 +167,11 @@ class RobotDodo:
             return persona
         else:
             print("➡️ NO ES PRIMERA VEZ - Búsqueda en BD\n")
-            self.interfaz.actualizar_estado("🔍 Buscando usuario")
             
-            # RF3.1: Buscar usuario existente
+            # RF3.1: Buscar usuario existente (mostrará nombre cuando se encuentre)
             persona = self.service.buscar_usuario_existente()
             
             if persona:
-                self.interfaz.actualizar_usuario(persona.name)
                 print(f"✅ Usuario encontrado: {persona.name} - Nivel: {persona.nivel_actual.name}\n")
                 return persona
             else:
@@ -186,8 +182,7 @@ class RobotDodo:
     
     def despedida(self):
         """Despedida después de completar sesión"""
-        self.interfaz.actualizar_estado("👋 Finalizando sesión...")
-        
+        # Mostrará eyes.gif al hablar
         self.audio.hablar("Has completado todos los ejercicios. ¡Excelente trabajo!")
         time.sleep(1)
         self.audio.hablar(f"Nos vemos pronto. Si me necesitas, di {Config.ACTIVATION_WORD}.")
@@ -199,6 +194,7 @@ class RobotDodo:
         
         self.activo = False
         
+        # Despedida (mostrará eyes.gif)
         self.audio.hablar("Hasta luego. Adiós.")
         time.sleep(0.5)
         
@@ -209,13 +205,20 @@ class RobotDodo:
         print("\n✅ Robot apagado\n")
         print("="*70 + "\n")
         
+        # Cerrar interfaz
+        if self.interfaz:
+            self.interfaz.cerrar()
+        
         sys.exit(0)
     
     def ejecutar(self):
-        """Ejecutar el robot"""
+        """Ejecutar el robot con interfaz unificada"""
         try:
             self.inicializar()
             self.modo_escucha()
+            
+            # Mantener el programa corriendo (la interfaz tiene su propio loop)
+            self.interfaz.mainloop()
             
         except KeyboardInterrupt:
             print("\n\n" + "="*70)
@@ -230,11 +233,21 @@ class RobotDodo:
             
             if self.db:
                 self.db.cerrar()
+            
+            if self.interfaz:
+                self.interfaz.cerrar()
 
 
 def main():
     """Función principal"""
-    robot = RobotDodo()
+    
+    print("\n" + "="*70)
+    print("  🚀 ROBOT DODO - INTERFAZ UNIFICADA")
+    print("  Una sola ventana, flujo continuo")
+    print("="*70 + "\n")
+    
+    # Crear y ejecutar robot
+    robot = RobotDodoUnificado()
     robot.ejecutar()
 
 

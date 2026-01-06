@@ -1,12 +1,6 @@
 """
-AUDIO - Sistema completo de audio
-BASADO EN TESTS FUNCIONALES:
-1. ElevenLabs (principal - máxima calidad con API)
-2. gTTS + mpg123 (backup - buena calidad)
-3. espeak (fallback - funciona siempre)
-4. Solo texto (si todos fallan)
-
-GRABACIÓN: sounddevice + soundfile (método más confiable)
+AUDIO MODIFICADO - Con notificaciones a la interfaz
+Notifica cuando empieza y termina de hablar para mostrar eyes.gif
 """
 import os
 import sys
@@ -18,7 +12,7 @@ import subprocess
 import tempfile
 from config import Config
 
-# Nuevos imports para sounddevice
+# Imports para sounddevice
 import sounddevice as sd
 import soundfile as sf
 
@@ -27,42 +21,40 @@ from elevenlabs import ElevenLabs
 from dotenv import load_dotenv
 
 
-class AudioSystem:
-    """Sistema completo de audio: reconocimiento, TTS y grabación"""
+class AudioSystemConInterfaz:
+    """Sistema de audio que notifica a la interfaz cuando habla"""
     
-    def __init__(self):
+    def __init__(self, interfaz=None):
         # Cargar variables de entorno
         load_dotenv()
+        
+        # Referencia a la interfaz para mostrar eyes.gif cuando habla
+        self.interfaz = interfaz
         
         # Reconocimiento de voz
         self.recognizer = sr.Recognizer()
         self.recognizer.energy_threshold = Config.ENERGY_THRESHOLD
         self.recognizer.dynamic_energy_threshold = False
         
-        # Síntesis de voz - Sistema híbrido
-        
+        # Síntesis de voz
         self.elevenlabs_client = None
         self.gtts_disponible = False
         self.elevenlabs_disponible = False
         self.mpg123_disponible = False
         self.espeak_disponible = False
-        self.sox_disponible = False  # Para control de velocidad
+        self.sox_disponible = False
         
-        # Verificar sounddevice para grabación
+        # Verificar sounddevice
         self.sounddevice_disponible = self._verificar_sounddevice()
         
-        # Intentar cargar ElevenLabs primero (mejor calidad)
+        # Inicializar TTS
         #self._inicializar_elevenlabs()
         self._inicializar_gtts_mpg123()
-        
-        # Verificar sox para control de velocidad
         self._verificar_sox()
         
-        # Intentar cargar gTTS + mpg123 como backup
         if not self.elevenlabs_disponible:
             self._inicializar_gtts_mpg123()
         
-        # Si gTTS no está disponible, verificar espeak
         if not self.elevenlabs_disponible and not self.gtts_disponible:
             self._inicializar_espeak()
         
@@ -74,10 +66,13 @@ class AudioSystem:
         self._mostrar_estado_tts()
         self._mostrar_estado_grabacion()
     
+    def set_interfaz(self, interfaz):
+        """Configurar la interfaz para notificaciones"""
+        self.interfaz = interfaz
+    
     def _verificar_sounddevice(self):
         """Verifica que sounddevice esté disponible"""
         try:
-            # Verificar que podemos acceder a dispositivos de audio
             devices = sd.query_devices()
             return True
         except Exception as e:
@@ -85,7 +80,7 @@ class AudioSystem:
             return False
     
     def _verificar_sox(self):
-        """Verifica que sox esté disponible para control de velocidad"""
+        """Verifica que sox esté disponible"""
         try:
             result = subprocess.run(['which', 'sox'], 
                                   capture_output=True, 
@@ -99,35 +94,31 @@ class AudioSystem:
             return False
     
     def _inicializar_elevenlabs(self):
-        """Inicializar ElevenLabs (MEJOR CALIDAD)"""
+        """Inicializar ElevenLabs"""
         try:
-            # Obtener API key del .env
             api_key = os.getenv('ELEVENLABS_API_KEY')
             
             if not api_key:
                 print("⚠️ ELEVENLABS_API_KEY no encontrada en .env")
                 return False
             
-            # Inicializar cliente de ElevenLabs
             self.elevenlabs_client = ElevenLabs(api_key=api_key)
             self.elevenlabs_disponible = True
             return True
             
         except ImportError:
-            print("⚠️ elevenlabs no está instalado. Instalar con: pip install elevenlabs")
+            print("⚠️ elevenlabs no está instalado")
             return False
         except Exception as e:
             print(f"⚠️ Error al inicializar ElevenLabs: {e}")
             return False
     
     def _inicializar_gtts_mpg123(self):
-        """Inicializar gTTS + mpg123 (MÉTODO QUE FUNCIONA EN TUS TESTS)"""
+        """Inicializar gTTS + mpg123"""
         try:
-            # Verificar que gTTS esté instalado
             from gtts import gTTS
             self.gTTS = gTTS
             
-            # Verificar que mpg123 esté disponible
             result = subprocess.run(['which', 'mpg123'], 
                                   capture_output=True, 
                                   text=True)
@@ -137,20 +128,19 @@ class AudioSystem:
                 self.gtts_disponible = True
                 return True
             else:
-                print("⚠️ mpg123 no está instalado. Instalar con: sudo apt-get install mpg123")
+                print("⚠️ mpg123 no está instalado")
                 return False
                 
         except ImportError:
-            print("⚠️ gTTS no está instalado. Instalar con: pip install gTTS")
+            print("⚠️ gTTS no está instalado")
             return False
         except Exception as e:
             print(f"⚠️ Error al verificar gTTS/mpg123: {e}")
             return False
     
     def _inicializar_espeak(self):
-        """Inicializar espeak como fallback (MÉTODO DE TU TEST_V2)"""
+        """Inicializar espeak"""
         try:
-            # Verificar que espeak esté disponible
             result = subprocess.run(['which', 'espeak'], 
                                   capture_output=True, 
                                   text=True)
@@ -159,7 +149,7 @@ class AudioSystem:
                 self.espeak_disponible = True
                 return True
             else:
-                print("⚠️ espeak no está instalado. Instalar con: sudo apt-get install espeak")
+                print("⚠️ espeak no está instalado")
                 return False
                 
         except Exception as e:
@@ -171,19 +161,12 @@ class AudioSystem:
         if self.elevenlabs_disponible:
             velocidad_msg = " (con control de velocidad)" if self.sox_disponible else " (velocidad básica)"
             print(f"✅ Sistema TTS: ElevenLabs - CALIDAD ULTRA PREMIUM 🎙️{velocidad_msg}")
-            if not self.sox_disponible:
-                print("   💡 Instala sox para mejor control de velocidad: sudo apt-get install sox")
         elif self.gtts_disponible and self.mpg123_disponible:
             print("✅ Sistema TTS: Google (gTTS + mpg123) - CALIDAD PREMIUM")
         elif self.espeak_disponible:
             print("✅ Sistema TTS: espeak - Funcional")
         else:
             print("⚠️ Sistema TTS: No disponible")
-            print("   El robot funcionará solo con texto en consola")
-            print("   Para habilitar voz:")
-            print("   1. ElevenLabs: pip install elevenlabs + agregar ELEVENLABS_API_KEY en .env")
-            print("   2. gTTS: pip install gTTS && sudo apt-get install mpg123")
-            print("   3. espeak: sudo apt-get install espeak")
     
     def _mostrar_estado_grabacion(self):
         """Mostrar estado del sistema de grabación"""
@@ -191,7 +174,6 @@ class AudioSystem:
             print("✅ Sistema de Grabación: sounddevice - ÓPTIMO")
         else:
             print("⚠️ Sistema de Grabación: No disponible")
-            print("   Instalar con: pip install sounddevice soundfile")
     
     # ========== RECONOCIMIENTO DE VOZ ==========
     
@@ -218,71 +200,68 @@ class AudioSystem:
             print(f"⚠️ Error: {e}")
             return None
     
-    # ========== SÍNTESIS DE VOZ (TTS) HÍBRIDA ==========
+    # ========== SÍNTESIS DE VOZ CON NOTIFICACIÓN ==========
     
     def hablar(self, texto: str, velocidad: float = 1.0):
         """
-        Convierte texto a voz usando sistema híbrido:
-        1. Intenta con ElevenLabs (API) - ULTRA CALIDAD
-        2. Si falla, usa gTTS + mpg123 (Google) - BUENA CALIDAD
-        3. Si falla, usa espeak - BÁSICO
-        4. Si todos fallan, solo imprime
+        Convierte texto a voz y MUESTRA EYES.GIF durante la reproducción
         """
         # SIEMPRE imprimir en consola
         print(f"🤖 Robot dice: {texto}")
         
-        # Intentar con ElevenLabs primero (mejor calidad)
+        # NOTIFICAR A LA INTERFAZ: Empezar a hablar (mostrar eyes.gif)
+        if self.interfaz:
+            self.interfaz.mostrar_eyes()
+        
+        # Intentar con ElevenLabs primero
         if self.elevenlabs_disponible:
             if self._hablar_con_elevenlabs(texto, velocidad):
-                return  # Éxito con ElevenLabs
+                # NOTIFICAR: Terminó de hablar
+                self._termino_de_hablar()
+                return
         
-        # Si ElevenLabs falló, intentar con gTTS + mpg123
+        # Si falló, intentar con gTTS + mpg123
         if self.gtts_disponible and self.mpg123_disponible:
             if self._hablar_con_gtts_mpg123(texto):
-                return  # Éxito con gTTS
+                self._termino_de_hablar()
+                return
         
-        # Si gTTS falló, intentar con espeak
+        # Si falló, intentar con espeak
         if self.espeak_disponible:
             if self._hablar_con_espeak(texto, velocidad):
-                return  # Éxito con espeak
+                self._termino_de_hablar()
+                return
         
-        # Si todos fallaron, el mensaje ya se imprimió en consola
+        # Si todos fallaron, el mensaje ya se imprimió
+        self._termino_de_hablar()
+    
+    def _termino_de_hablar(self):
+        """Notificar que terminó de hablar"""
+        # No hacemos nada aquí, la interfaz permanece en eyes.gif
+        # hasta que explícitamente cambie a otro estado
+        pass
     
     def _hablar_con_elevenlabs(self, texto: str, velocidad: float = 1.0) -> bool:
-        """
-        Hablar usando ElevenLabs API (MÁXIMA CALIDAD)
-        velocidad: 0.5 (muy lento) a 2.0 (muy rápido)
-        """
+        """Hablar usando ElevenLabs API"""
         try:
-            # Generar audio con ElevenLabs con configuración óptima
             audio_generator = self.elevenlabs_client.text_to_speech.convert(
-                voice_id="pNInz6obpgDQGcFmaJgB",  # Cambiar por otra voz si quieres
+                voice_id="pNInz6obpgDQGcFmaJgB",
                 text=texto,
                 model_id="eleven_multilingual_v2"
             )
             
-            # Crear archivo temporal para el audio
             with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as temp_file:
                 temp_filename = temp_file.name
                 
-                # Escribir el audio en el archivo
                 for chunk in audio_generator:
                     if chunk:
                         temp_file.write(chunk)
             
-            # CONTROL DE VELOCIDAD REAL usando sox o mpg123
             reproduccion_exitosa = False
             
-            # Opción 1: sox (mejor calidad, mantiene el pitch)
-            if velocidad != 1.0:
+            # Intentar con sox + mpg123
+            if velocidad != 1.0 and self.sox_disponible:
                 try:
-                    # sox cambia la velocidad sin alterar el tono
-                    subprocess.run(['sox', temp_filename, '-t', 'mp3', '-', 
-                                  'tempo', str(velocidad)], 
-                                 stdout=subprocess.PIPE,
-                                 stderr=subprocess.DEVNULL,
-                                 check=True)
-                    # Reproducir con mpg123
                     proceso_sox = subprocess.Popen(['sox', temp_filename, '-t', 'mp3', '-', 
                                                    'tempo', str(velocidad)],
                                                   stdout=subprocess.PIPE,
@@ -293,85 +272,41 @@ class AudioSystem:
                                  stderr=subprocess.DEVNULL)
                     proceso_sox.wait()
                     reproduccion_exitosa = True
-                except (FileNotFoundError, subprocess.CalledProcessError):
+                except:
                     pass
             
-            # Opción 2: mpg123 solo (sin sox, velocidad con pitch alterado)
+            # Fallback a mpg123 solo
             if not reproduccion_exitosa:
                 try:
-                    # Calcular el factor de delay para mpg123
-                    # Valores negativos = más rápido, positivos = más lento
-                    # -1 es aproximadamente 2x velocidad
-                    if velocidad != 1.0:
-                        # Convertir velocidad a delay de mpg123
-                        # Esta es una aproximación, no es perfecta
-                        delay = int((1.0 - velocidad) * 100)
-                        delay = max(-50, min(50, delay))  # Limitar entre -50 y 50
-                        subprocess.run(['mpg123', '-q', '-d', str(delay), temp_filename], 
-                                     check=True, 
-                                     stderr=subprocess.DEVNULL)
-                    else:
-                        subprocess.run(['mpg123', '-q', temp_filename], 
-                                     check=True, 
-                                     stderr=subprocess.DEVNULL)
-                    reproduccion_exitosa = True
-                except (FileNotFoundError, subprocess.CalledProcessError):
-                    pass
-            
-            # Opción 2: Si mpg123 falló, intentar con ffplay (de ffmpeg)
-            if not reproduccion_exitosa:
-                try:
-                    subprocess.run(['ffplay', '-nodisp', '-autoexit', '-hide_banner', 
-                                  '-loglevel', 'quiet', temp_filename], 
+                    subprocess.run(['mpg123', '-q', temp_filename], 
                                  check=True, 
                                  stderr=subprocess.DEVNULL)
                     reproduccion_exitosa = True
-                except (FileNotFoundError, subprocess.CalledProcessError):
+                except:
                     pass
             
-            # Opción 3: Si ffplay falló, intentar con play (sox)
-            if not reproduccion_exitosa:
-                try:
-                    subprocess.run(['play', '-q', temp_filename], 
-                                 check=True, 
-                                 stderr=subprocess.DEVNULL)
-                    reproduccion_exitosa = True
-                except (FileNotFoundError, subprocess.CalledProcessError):
-                    pass
-            
-            # Eliminar archivo temporal
             try:
                 os.remove(temp_filename)
             except:
                 pass
             
-            if not reproduccion_exitosa:
-                raise Exception("No se encontró ningún reproductor de audio disponible")
-            
-            return True
+            return reproduccion_exitosa
             
         except Exception as e:
-            print(f"⚠️ ElevenLabs falló: {e}. Intentando con método alternativo...")
+            print(f"⚠️ ElevenLabs falló: {e}")
             return False
     
     def _hablar_con_gtts_mpg123(self, texto: str) -> bool:
-        """
-        Hablar usando gTTS + mpg123 (MÉTODO DE TU TEST)
-        Este es el método que funciona en test_01_hablar_gtts.py
-        """
+        """Hablar usando gTTS + mpg123"""
         try:
-            # Crear archivo temporal
             with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as temp_file:
                 temp_filename = temp_file.name
             
-            # Generar audio con gTTS
             tts = self.gTTS(text=texto, lang='es', slow=False)
             tts.save(temp_filename)
             
-            # Reproducir con mpg123 (en modo silencioso con -q)
             subprocess.run(['mpg123', '-q', temp_filename], check=True)
             
-            # Eliminar archivo temporal
             try:
                 os.remove(temp_filename)
             except:
@@ -379,63 +314,39 @@ class AudioSystem:
             
             return True
             
-        except subprocess.CalledProcessError as e:
-            print(f"⚠️ Error ejecutando mpg123: {e}")
-            return False
         except Exception as e:
-            print(f"⚠️ gTTS falló: {e}. Intentando con espeak...")
+            print(f"⚠️ gTTS falló: {e}")
             return False
     
     def _hablar_con_espeak(self, texto: str, velocidad: float = 1.0) -> bool:
-        """
-        Hablar usando espeak (MÉTODO DE TU TEST_V2)
-        Este es el método que funciona en test_01_hablar_v2.py
-        """
+        """Hablar usando espeak"""
         try:
-            # Calcular velocidad para espeak (palabras por minuto)
-            # Config.TTS_RATE es aprox 150, ajustamos con el factor velocidad
             velocidad_espeak = int(Config.TTS_RATE * velocidad)
-            
-            # Comando espeak
             comando = ['espeak', '-v', 'es', '-s', str(velocidad_espeak), texto]
-            
-            # Ejecutar espeak
             subprocess.run(comando, check=True)
-            
             return True
             
-        except subprocess.CalledProcessError as e:
-            print(f"⚠️ Error ejecutando espeak: {e}")
-            return False
-        except FileNotFoundError:
-            print("⚠️ espeak no encontrado")
-            return False
         except Exception as e:
             print(f"⚠️ espeak falló: {e}")
             return False
     
-    # ========== GRABACIÓN CON SOUNDDEVICE ==========
+    # ========== GRABACIÓN ==========
     
     def grabar(self, duracion: int, person_id: int, exercise_id: int) -> Optional[str]:
-        """
-        Graba audio usando sounddevice y retorna path del archivo
-        MÉTODO MEJORADO: sounddevice + soundfile
-        """
+        """Graba audio usando sounddevice"""
         if not self.sounddevice_disponible:
-            print("❌ sounddevice no está disponible. No se puede grabar.")
+            print("❌ sounddevice no está disponible")
             return None
         
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         nombre_archivo = f"{Config.AUDIO_FOLDER}/audio_{person_id}_{exercise_id}_{timestamp}.wav"
         
         try:
-            # Parámetros de grabación
             sample_rate = 44100
             channels = 1
             
             print(f"🎙️ Grabando {duracion} segundos...")
             
-            # Grabar audio
             audio_data = sd.rec(
                 int(duracion * sample_rate),
                 samplerate=sample_rate,
@@ -443,10 +354,8 @@ class AudioSystem:
                 dtype='int16'
             )
             
-            # Esperar a que termine la grabación
             sd.wait()
             
-            # Guardar archivo WAV
             sf.write(nombre_archivo, audio_data, sample_rate)
             
             print(f"✅ Audio grabado: {nombre_archivo}")
@@ -456,13 +365,8 @@ class AudioSystem:
             print(f"⚠️ Error al grabar audio: {e}")
             return None
     
-    # ========== OPERACIÓN COMBINADA ==========
-    
     def grabar_y_escuchar(self, duracion: int, person_id: int, exercise_id: int) -> tuple:
-        """
-        Graba audio Y reconoce voz simultáneamente
-        ACTUALIZADO para usar sounddevice en grabación
-        """
+        """Graba audio Y reconoce voz simultáneamente"""
         texto_reconocido = None
         audio_path = None
         
@@ -494,12 +398,13 @@ class AudioSystem:
     def detener(self):
         """Detener reproducción de audio"""
         try:
-            # Intentar matar procesos de mpg123 o espeak si están corriendo
             subprocess.run(['killall', 'mpg123'], stderr=subprocess.DEVNULL)
             subprocess.run(['killall', 'espeak'], stderr=subprocess.DEVNULL)
             subprocess.run(['killall', 'play'], stderr=subprocess.DEVNULL)
-            
-            # Detener sounddevice si está reproduciendo
             sd.stop()
         except:
             pass
+
+
+# Alias para compatibilidad
+AudioSystem = AudioSystemConInterfaz
