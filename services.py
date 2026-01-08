@@ -2,6 +2,7 @@
 SERVICES CON INTERFAZ UNIFICADA Y GRABACIÓN DE AUDIO
 Usa los diferentes estados de la interfaz según el flujo
 Graba automáticamente los audios de cada ejercicio de forma organizada
+MODIFICADO: Test diagnóstico también muestra imágenes y graba audio
 """
 import time
 from typing import Optional, List
@@ -105,7 +106,7 @@ class RobotServiceInterfazUnificada:
         # MOSTRAR EL NOMBRE EN LA INTERFAZ
         if self.interfaz:
             self.interfaz.mostrar_nombre(nombre)
-            time.sleep(2)  # Dar tiempo para ver el nombre
+            time.sleep(3)  # Dar tiempo para ver el nombre
         
         # Confirmar nombre (mostrará eyes.gif al hablar)
         self.audio.hablar(f"Mucho gusto, {nombre}.")
@@ -141,7 +142,7 @@ class RobotServiceInterfazUnificada:
         # MOSTRAR NOMBRE COMPLETO
         if self.interfaz:
             self.interfaz.mostrar_nombre(nombre_completo)
-            time.sleep(2)
+            time.sleep(4)
         
         # === EDAD ===
         edad = pedir_edad_con_reintentos(
@@ -154,6 +155,11 @@ class RobotServiceInterfazUnificada:
             return None
         
         print(f"✅ Edad obtenida: {edad} años")
+        
+        # MOSTRAR EDAD
+        if self.interfaz:
+            self.interfaz.mostrar_nombre(edad)
+            time.sleep(4)
         
         # === CONFIRMACIÓN ===
         confirmado = confirmar_con_usuario(
@@ -184,42 +190,114 @@ class RobotServiceInterfazUnificada:
             return None
     
     def realizar_test_diagnostico(self, persona: Persona) -> NivelTerapia:
-        """RF1.2 y RF1.3: Test diagnóstico"""
+        """RF1.2 y RF1.3: Test diagnóstico CON IMÁGENES Y GRABACIÓN"""
         print("\n🎯 === TEST DIAGNÓSTICO ===")
         
         self.audio.hablar(f"Hola {persona.name}. Vamos a hacer un pequeño test.")
         time.sleep(1)
         
-        # Test simplificado
-        preguntas_test = [
-            ("Di la palabra: CASA", "casa"),
-            ("Di la palabra: PELOTA", "pelota"),
-            ("Di la palabra: MARIPOSA", "mariposa")
+        # Test completo - usar palabras que tienen imagen en la BD
+        palabras_test = [
+            # Nivel INICIAL
+            "MAMÁ", "PAPÁ",
+            # Nivel BASICO
+            "BOCA", "PATO",
+            # Nivel INTERMEDIO
+            "CASA", "GATO",
+            # Nivel AVANZADO
+            "LORO", "PERRO"
         ]
         
         aciertos = 0
-        total = len(preguntas_test)
+        total = len(palabras_test)
         
-        for i, (pregunta, palabra_esperada) in enumerate(preguntas_test, 1):
-            print(f"\n--- Test {i}/{total}: {palabra_esperada.upper()} ---")
+        for i, palabra in enumerate(palabras_test, 1):
+            print(f"\n--- Test {i}/{total}: {palabra} ---")
             
-            # Hacer la pregunta (mostrará eyes.gif)
-            self.audio.hablar(pregunta)
+            # Buscar el ejercicio en la BD para obtener la imagen
+            ejercicio_test = None
+            ejercicios_bd = self.db.obtener_todos_ejercicios()
+            for ej in ejercicios_bd:
+                if ej.word.upper() == palabra.upper():
+                    ejercicio_test = ej
+                    break
             
-            # Evaluar con IA
-            correcto, respuesta, feedback_ia = evaluacion_ejercicio_con_ia(
-                audio_system=self.audio,
-                palabra_esperada=palabra_esperada,
-                interfaz=None,
-                max_intentos=2
+            # MOSTRAR EJERCICIO (imagen + palabra)
+            if self.interfaz:
+                ruta_imagen = ejercicio_test.apoyo_visual if ejercicio_test and ejercicio_test.apoyo_visual else None
+                self.interfaz.mostrar_ejercicio(
+                    palabra=palabra,
+                    ruta_imagen=ruta_imagen
+                )
+            
+            # Dar instrucción (mostrará eyes.gif automáticamente)
+            self.audio.hablar(f"Repite: {palabra}")
+            
+            # VOLVER A MOSTRAR EJERCICIO después de hablar
+            if self.interfaz:
+                ruta_imagen = ejercicio_test.apoyo_visual if ejercicio_test and ejercicio_test.apoyo_visual else None
+                self.interfaz.mostrar_ejercicio(
+                    palabra=palabra,
+                    ruta_imagen=ruta_imagen
+                )
+            
+            time.sleep(0.5)
+            
+            # === GRABAR Y EVALUAR SIMULTÁNEAMENTE ===
+            print(f"🎙️ Grabando audio del test: {palabra}")
+            
+            # Grabar y escuchar
+            respuesta, audio_path = self.audio.grabar_y_escuchar(
+                duracion=Config.RECORDING_DURATION,
+                person_id=persona.person_id,
+                exercise_id=ejercicio_test.exercise_id if ejercicio_test else 0,
+                ejercicio_nombre=f"TEST_{palabra}",
+                nivel_actual="DIAGNOSTICO",
+                numero_sesion=0
             )
+            
+            # Si no obtuvimos texto reconocido, dar otra oportunidad
+            if not respuesta:
+                print("⚠️ Primera grabación sin texto reconocido, dando otra oportunidad...")
+                self.audio.hablar("No te escuché bien. Intenta una vez más.")
+                
+                # Segundo intento
+                respuesta, audio_path_2 = self.audio.grabar_y_escuchar(
+                    duracion=Config.RECORDING_DURATION,
+                    person_id=persona.person_id,
+                    exercise_id=ejercicio_test.exercise_id if ejercicio_test else 0,
+                    ejercicio_nombre=f"TEST_{palabra}",
+                    nivel_actual="DIAGNOSTICO",
+                    numero_sesion=0
+                )
+                
+                if audio_path_2:
+                    audio_path = audio_path_2
+            
+            # Evaluar respuesta con IA
+            if respuesta:
+                correcto, confianza, feedback_ia = comparar_palabras(palabra, respuesta)
+                print(f"📊 Evaluación: correcto={correcto}, confianza={confianza:.2f}")
+                print(f"💬 Feedback IA: {feedback_ia}")
+            else:
+                correcto = False
+                feedback_ia = "No logré escucharte, pero está bien. Sigamos."
+                print("⚠️ No se pudo evaluar (sin texto reconocido)")
+            
+            # Feedback visual EN EL EJERCICIO
+            if self.interfaz:
+                self.interfaz.mostrar_feedback_ejercicio(correcto)
             
             if correcto:
                 aciertos += 1
             
-            # Dar feedback (mostrará eyes.gif)
+            # Dar feedback verbal (mostrará eyes.gif)
             self.audio.hablar(feedback_ia)
             time.sleep(1)
+        
+        # Volver a eyes.gif
+        if self.interfaz:
+            self.interfaz.mostrar_eyes()
         
         # Clasificación
         tasa_exito = aciertos / total
@@ -238,7 +316,8 @@ class RobotServiceInterfazUnificada:
         
         self.audio.hablar(f"Muy bien. Tu nivel es: {nivel.name}")
         
-        print(f"✅ Nivel asignado: {nivel.name}\n")
+        print(f"✅ Nivel asignado: {nivel.name}")
+        print(f"🎙️ Audios del test grabados en: audio_registros/{persona.person_id}/\n")
         return nivel
     
     # ========== RF3: RECONOCIMIENTO DE USUARIO ==========

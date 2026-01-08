@@ -185,8 +185,8 @@ class InterfazUnificada:
             screen_width = self.ventana.winfo_screenwidth()
             screen_height = self.ventana.winfo_screenheight()
             
-            max_width = int(screen_width * 0.6)
-            max_height = int(screen_height * 0.6)
+            max_width = int(screen_width * 0.8)
+            max_height = int(screen_height * 0.8)
             
             # Extraer frames
             self.frames_gif = []
