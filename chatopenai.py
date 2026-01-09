@@ -155,6 +155,61 @@ Respuesta:"""
                 return True, texto_limpio
             return False, None
     
+    def validar_apellido(self, texto: str) -> Tuple[bool, Optional[str]]:
+        """
+        Valida y extrae un apellido usando IA
+        
+        Returns:
+            (es_valido, apellido_extraido)
+        """
+        if not texto or not texto.strip():
+            return False, None
+        
+        prompt = f"""
+    Extrae el APELLIDO de esta respuesta de un niño.
+    Respuesta: "{texto}"
+
+    Reglas:
+    - Si hay un apellido claro, devuélvelo en formato Title Case (Primera Letra Mayúscula)
+    - Si no hay apellido, responde: NONE
+    - Ignora palabras como "mi apellido es", "me apellido", "soy"
+    - Solo extrae el apellido, nada más
+    - Los apellidos pueden ser compuestos (dos palabras)
+
+    Ejemplos:
+    "mi apellido es garcía" → García
+    "soy martínez" → Martínez
+    "lópez" → López
+    "garcía pérez" → García Pérez
+    "rodríguez" → Rodríguez
+    "blablabla" → NONE
+    "no sé" → NONE
+
+    Respuesta:"""
+
+        try:
+            respuesta = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=30,
+                temperature=0.1
+            )
+            
+            apellido = respuesta.choices[0].message.content.strip()
+            
+            if apellido == "NONE" or len(apellido) < 2:
+                return False, None
+            
+            return True, apellido
+            
+        except Exception as e:
+            print(f"❌ Error en validar_apellido: {e}")
+            # Fallback simple
+            texto_limpio = texto.strip().title()
+            if len(texto_limpio) >= 2:
+                return True, texto_limpio
+            return False, None
+    
     def validar_edad(self, texto: str) -> Tuple[bool, Optional[int]]:
         """
         Valida y extrae una edad usando IA
@@ -170,7 +225,7 @@ Extrae la EDAD en números de esta respuesta.
 Respuesta: "{texto}"
 
 Reglas:
-- Si hay una edad clara entre 1 y 18, devuélvela como número
+- Si hay una edad clara, devuélvela como número
 - Si no hay edad válida, responde: NONE
 - Convierte palabras a números: "cinco" → 5, "diez" → 10
 
@@ -198,7 +253,7 @@ Responde SOLO con el número o NONE:"""
             
             try:
                 edad = int(resultado)
-                if 1 <= edad <= 18:
+                if 3 <= edad <= 80:
                     return True, edad
             except:
                 pass
@@ -397,6 +452,10 @@ def validar_si_no(texto: str) -> Tuple[bool, str]:
 def validar_nombre(texto: str) -> Tuple[bool, Optional[str]]:
     """Valida y extrae nombre"""
     return _asistente_inteligente.validar_nombre(texto)
+
+def validar_apellido(texto: str) -> Tuple[bool, Optional[str]]:
+    """Valida y extrae apellido"""
+    return _asistente_inteligente.validar_apellido(texto)
 
 
 def validar_edad(texto: str) -> Tuple[bool, Optional[int]]:

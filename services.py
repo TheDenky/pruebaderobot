@@ -12,7 +12,7 @@ from database import Database
 
 # Importar sistema de IA
 from chatopenai import (
-    consultar, validar_si_no, validar_nombre, validar_edad,
+    consultar, validar_si_no, validar_nombre, validar_apellido, validar_edad,
     comparar_palabras, detectar_salir, feedback_motivador
 )
 from sistema_reintentos import (
@@ -114,7 +114,7 @@ class RobotServiceInterfazUnificada:
         
         # === APELLIDO ===
         def validador_apellido(respuesta: str):
-            es_valido, apellido = validar_nombre(respuesta)
+            es_valido, apellido = validar_apellido(respuesta)
             return es_valido, apellido
         
         exito, apellido = preguntar_con_reintentos(
@@ -209,6 +209,7 @@ class RobotServiceInterfazUnificada:
         ]
         
         aciertos = 0
+        totalConfianza = 0
         total = len(palabras_test)
         
         for i, palabra in enumerate(palabras_test, 1):
@@ -223,12 +224,12 @@ class RobotServiceInterfazUnificada:
                     break
             
             # MOSTRAR EJERCICIO (imagen + palabra)
-            if self.interfaz:
-                ruta_imagen = ejercicio_test.apoyo_visual if ejercicio_test and ejercicio_test.apoyo_visual else None
-                self.interfaz.mostrar_ejercicio(
-                    palabra=palabra,
-                    ruta_imagen=ruta_imagen
-                )
+#             if self.interfaz:
+#                 ruta_imagen = ejercicio_test.apoyo_visual if ejercicio_test and ejercicio_test.apoyo_visual else None
+#                 self.interfaz.mostrar_ejercicio(
+#                     palabra=palabra,
+#                     ruta_imagen=ruta_imagen
+#                 )
             
             # Dar instrucción (mostrará eyes.gif automáticamente)
             self.audio.hablar(f"Repite: {palabra}")
@@ -261,6 +262,19 @@ class RobotServiceInterfazUnificada:
                 print("⚠️ Primera grabación sin texto reconocido, dando otra oportunidad...")
                 self.audio.hablar("No te escuché bien. Intenta una vez más.")
                 
+                # Dar instrucción (mostrará eyes.gif automáticamente)
+                self.audio.hablar(f"{palabra}")
+                
+                # VOLVER A MOSTRAR EJERCICIO después de hablar
+                if self.interfaz:
+                    ruta_imagen = ejercicio_test.apoyo_visual if ejercicio_test and ejercicio_test.apoyo_visual else None
+                    self.interfaz.mostrar_ejercicio(
+                        palabra=palabra,
+                        ruta_imagen=ruta_imagen
+                    )
+                
+                time.sleep(0.5)
+                
                 # Segundo intento
                 respuesta, audio_path_2 = self.audio.grabar_y_escuchar(
                     duracion=Config.RECORDING_DURATION,
@@ -277,6 +291,8 @@ class RobotServiceInterfazUnificada:
             # Evaluar respuesta con IA
             if respuesta:
                 correcto, confianza, feedback_ia = comparar_palabras(palabra, respuesta)
+                totalConfianza+=confianza
+                print("Confiaza acumulada:", totalConfianza)
                 print(f"📊 Evaluación: correcto={correcto}, confianza={confianza:.2f}")
                 print(f"💬 Feedback IA: {feedback_ia}")
             else:
@@ -301,9 +317,12 @@ class RobotServiceInterfazUnificada:
         
         # Clasificación
         tasa_exito = aciertos / total
+        print("Total de confianza:", totalConfianza, " Evaluacion:", (totalConfianza/total))
         print(f"\n📊 Resultado test: {aciertos}/{total} ({tasa_exito*100:.0f}%)")
         
-        if tasa_exito >= 0.8:
+        if tasa_exito >= 0.9:
+            nivel = NivelTerapia.AVANZADO
+        elif tasa_exito >= 0.7:
             nivel = NivelTerapia.INTERMEDIO
         elif tasa_exito >= 0.5:
             nivel = NivelTerapia.BASICO
@@ -467,14 +486,14 @@ class RobotServiceInterfazUnificada:
         """
         
         # MOSTRAR EJERCICIO (imagen + palabra)
-        if self.interfaz:
-            ruta_imagen = ejercicio.apoyo_visual if ejercicio.apoyo_visual else None
-            self.interfaz.mostrar_ejercicio(
-                palabra=ejercicio.word,
-                ruta_imagen=ruta_imagen
-            )
-        
-        # Dar instrucción (mostrará eyes.gif automáticamente)
+#         if self.interfaz:
+#             ruta_imagen = ejercicio.apoyo_visual if ejercicio.apoyo_visual else None
+#             self.interfaz.mostrar_ejercicio(
+#                 palabra=ejercicio.word,
+#                 ruta_imagen=ruta_imagen
+#             )
+#         
+#         # Dar instrucción (mostrará eyes.gif automáticamente)
         self.audio.hablar(f"Repite: {ejercicio.word}")
         
         # VOLVER A MOSTRAR EJERCICIO después de hablar
@@ -514,6 +533,16 @@ class RobotServiceInterfazUnificada:
         if not respuesta:
             print("⚠️ Primera grabación sin texto reconocido, dando otra oportunidad...")
             self.audio.hablar("No te escuché bien. Intenta una vez más.")
+            
+            self.audio.hablar(f"{ejercicio.word}")
+            if self.interfaz:
+                ruta_imagen = ejercicio.apoyo_visual if ejercicio.apoyo_visual else None
+                self.interfaz.mostrar_ejercicio(
+                    palabra=ejercicio.word,
+                    ruta_imagen=ruta_imagen
+                )
+            
+            time.sleep(0.5)
             
             # Segundo intento
             respuesta, audio_path_2 = self.audio.grabar_y_escuchar(

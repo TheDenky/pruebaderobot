@@ -60,7 +60,14 @@ class RobotDodoUnificado:
         print("="*70 + "\n")
         
         # Mensaje inicial por voz (mostrará eyes.gif)
-        respuesta = consultar("Di un saludo corto que no sea hola, luego indica que si te necesita solo te salude")
+        
+#         descripcion = ("¡Hola amiguito! Soy DODO, un robot muy especial que va a ser tu amigo en esta aventura. Vamos a jugar juntos practicando palabras. Es muy fácil y divertido. Te voy a enseñar imágenes súper bonitas de animales, objetos y muchas cosas más. Tú solo tienes que decir qué es lo que ves. Cuando lo hagas bien, ganarás estrellas. Tengo cuatro niveles, desde el más fácil hasta el más difícil. Empezarás con cositas simples como las vocales A, E, I, O, U, y poco a poco iremos practicando palabras más grandes. Lo mejor es que voy a grabar tu voz para que puedas escuchar cómo vas mejorando cada día. Eso es súper emocionante. Cuando te sientas listo para empezar nuestra aventura de hoy, solo di la palabra mágica: hola robot.")
+#         presentacion = consultar("Haz una descripcion corta de lo que haces para niños")
+#         presentacion = "¡Hola! Soy el robot DODO. Ayudo a niños a hablar mejor. Juntos, aprendemos y nos divertimos. ¡Tú puedes!"
+#         self.audio.hablar(presentacion, velocidad=1)
+        
+#         respuesta = consultar("Di un saludo corto que no sea hola, luego indica que si te necesita solo te salude")
+        respuesta = "Si me necesitas, solo dime: hola robot. ¡Estoy aquí para ayudar!"
         self.audio.hablar(respuesta, velocidad=1)
         
         imprimir_seccion("ROBOT EN MODO ESCUCHA")
@@ -70,14 +77,29 @@ class RobotDodoUnificado:
         
         def escucha_continua():
             """Función que corre en hilo separado"""
+            import time as time_module
+            ultima_actividad = time_module.time()
+            sleeping = False
+            
             while self.activo:
                 try:
                     hora = datetime.now().strftime('%H:%M:%S')
                     print(f"[{hora}] 👂 Escuchando... (di '{Config.ACTIVATION_WORD}' o 'adiós')")
                     
                     texto = self.audio.escuchar(timeout=Config.AUDIO_TIMEOUT)
-                    
+
+                    # Verificar inactividad (60 segundos)
+                    tiempo_inactivo = time_module.time() - ultima_actividad
+                    if tiempo_inactivo >= 5 and not sleeping:
+                        hora = datetime.now().strftime('%H:%M:%S')
+                        print(f"[{hora}] 💤 Inactividad detectada. Modo sleeping...")
+                        if self.interfaz:
+                            self.interfaz.mostrar_eyes_sleeping()
+                        sleeping = True
+
                     if texto:
+                        
+                        
                         texto_lower = texto.lower()
                         print(f"[{hora}] 📢 Escuché: '{texto}'")
                         
@@ -89,6 +111,20 @@ class RobotDodoUnificado:
                         
                         # Detectar palabra de activación
                         elif Config.ACTIVATION_WORD in texto_lower:
+                            
+                            # Resetear temporizador de inactividad
+                            ultima_actividad = time_module.time()
+                            
+                            # Si estaba durmiendo, despertar
+                            if sleeping:
+                                hora = datetime.now().strftime('%H:%M:%S')
+                                print(f"[{hora}] 👁️ Despertando...")
+                                print("Self intefaz:", self.interfaz)
+                                if self.interfaz:
+                                    self.interfaz.mostrar_eyes()
+                                sleeping = False
+                                print("Estado de Sleeping:", sleeping)
+                                
                             print(f"[{hora}] ✅ ¡ROBOT ACTIVADO!\n")
                             # Ejecutar modo activo en el mismo hilo
                             self.modo_activo()
@@ -118,6 +154,11 @@ class RobotDodoUnificado:
         self.audio.hablar("Hola, aquí estoy.")
         time.sleep(0.5)
         
+        # ========== AGREGAR ESTA SECCIÓN COMPLETA ==========
+        # Preguntar cómo está el niño
+        self._preguntar_estado_animo()
+        # ===================================================
+        
         try:
             # PASO 1: Identificación (mostrará nombre cuando se obtenga)
             persona = self.identificar_usuario()
@@ -144,6 +185,65 @@ class RobotDodoUnificado:
             print("─"*70 + "\n")
             time.sleep(2)
     
+    def _preguntar_estado_animo(self):
+        """Preguntar al niño cómo se encuentra y dar respuesta de ánimo"""
+        from chatopenai import consultar
+        
+        print("\n💬 === PREGUNTA DE ÁNIMO ===")
+        
+        # Hacer la pregunta
+        if self.interfaz:
+            self.interfaz.mostrar_eyes()
+        
+        pregunta = consultar(
+            "Di una pregunta muy breve para preguntar a un niño cómo se siente hoy. "
+            "Máximo 1 frase corta.",
+            contexto="Eres un robot amigable"
+        )
+
+        self.audio.hablar(pregunta)
+        
+        # Escuchar respuesta del niño
+        print("👂 Escuchando respuesta...")
+        respuesta = self.audio.escuchar(timeout=10, phrase_time_limit=10)
+        
+        if respuesta:
+            print(f"📢 El niño dijo: '{respuesta}'")
+            
+            # Generar respuesta de ánimo personalizada con IA
+            from chatopenai import consultar
+            
+            if "triste" in respuesta.lower() or "mal" in respuesta.lower():
+                mensaje_animo = consultar(
+                    "El niño está triste o no se siente bien. "
+                    "Dale palabras de consuelo y ánimo muy breves."
+                    "Da una respuesta sin hacer preguntas y breve"
+                )
+            elif "bien" in respuesta.lower() or "feliz" in respuesta.lower():
+                mensaje_animo = consultar(
+                    "El niño está bien o feliz. "
+                    "Celébralo y mantén su energía positiva."
+                    "Da una respuesta sin hacer preguntas y breve"
+                )
+            else:
+                mensaje_animo = consultar(
+                    f"El niño respondió: '{respuesta}'. "
+                    "Da una respuesta apropiada sin hacer preguntas y breve."
+                )
+            
+            print(f"🤖 Respuesta generada: {mensaje_animo}")
+            
+            # Dar la respuesta de ánimo
+            self.audio.hablar(mensaje_animo)
+            time.sleep(1)
+        else:
+            print("⚠️ No se escuchó respuesta")
+            # Mensaje genérico si no responde
+            self.audio.hablar("Está bien. Vamos a empezar entonces.")
+            time.sleep(0.5)
+        
+        print()
+        
     def identificar_usuario(self):
         """Identificar si es primera vez o usuario registrado"""
         from utils import imprimir_seccion

@@ -32,6 +32,11 @@ class InterfazUnificada:
         self.frame_actual_gif = 0
         self.animando_gif = False
         self.imagen_gif_actual = None
+        # Widgets para eyes_sleeping.gif
+        self.frames_sleeping = []
+        self.frame_actual_sleeping = 0
+        self.animando_sleeping = False
+        self.modo_sleeping = False
         
         # Widgets para mostrar nombre
         self.label_nombre = None
@@ -143,29 +148,51 @@ class InterfazUnificada:
     
     def mostrar_eyes(self):
         """Mostrar eyes.gif (estado default)"""
-        if self.estado_actual == self.ESTADO_EYES:
-            return  # Ya está en este estado
+        # Desactivar modo sleeping si estaba activo
+        self.modo_sleeping = False
+        self.animando_sleeping = False
+        
+#         if self.estado_actual == self.ESTADO_EYES and not self.modo_sleeping:
+#             return
         
         self.estado_actual = self.ESTADO_EYES
-        
-        # Limpiar contenedor
         self._limpiar_contenedor()
-        
-        # Mostrar label del GIF
         self.label_gif.pack(expand=True)
         
-        # Cargar GIF si no está cargado
         if not self.frames_gif:
             self._cargar_gif('eyes.gif')
         
-        # Iniciar animación
         if self.frames_gif and not self.animando_gif:
             self.animando_gif = True
             self._animar_gif()
         
+        self.ventana.update_idletasks()
+        self.ventana.update()
+        
+    def mostrar_eyes_sleeping(self):
+        """Mostrar eyes_sleeping.gif cuando hay inactividad"""
+        if self.modo_sleeping:
+            return
+        
+        print("💤 Modo sleeping activado")
+        self.modo_sleeping = True
+        self.estado_actual = self.ESTADO_EYES
+        self.animando_gif = False
+        
+        self._limpiar_contenedor()
+        self.label_gif.pack(expand=True)
+        
+        if not self.frames_sleeping:
+            self._cargar_gif('eyes_sleeping.gif', sleeping=True)
+        
+        if self.frames_sleeping and not self.animando_sleeping:
+            self.animando_sleeping = True
+            self.frame_actual_sleeping = 0
+            self._animar_gif_sleeping()
+        
         self.ventana.update()
     
-    def _cargar_gif(self, ruta_gif):
+    def _cargar_gif(self, ruta_gif, sleeping=False):
         """Cargar frames del GIF"""
         if not os.path.exists(ruta_gif):
             print(f"⚠️ No se encontró {ruta_gif}, usando texto")
@@ -189,22 +216,30 @@ class InterfazUnificada:
             max_height = int(screen_height * 0.8)
             
             # Extraer frames
-            self.frames_gif = []
+            if sleeping:
+                self.frames_sleeping = []
+            else:
+                self.frames_gif = []
             try:
                 while True:
                     frame = gif.copy()
                     frame.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
                     photo = ImageTk.PhotoImage(frame)
-                    self.frames_gif.append(photo)
+                    if sleeping:
+                        self.frames_sleeping.append(photo)
+                    else:
+                        self.frames_gif.append(photo)
                     gif.seek(len(self.frames_gif))
             except EOFError:
                 pass
             
-            if len(self.frames_gif) == 0:
+            frames = self.frames_sleeping if sleeping else self.frames_gif
+
+            if len(frames) == 0:
                 print("⚠️ No se pudieron extraer frames del GIF")
                 return False
-            
-            print(f"✅ GIF cargado: {len(self.frames_gif)} frames")
+
+            print(f"✅ GIF {'sleeping' if sleeping else 'normal'} cargado: {len(frames)} frames")
             return True
             
         except Exception as e:
@@ -235,6 +270,22 @@ class InterfazUnificada:
     
     # ========== ESTADO: NOMBRE ==========
     
+    def _animar_gif_sleeping(self):
+        """Animar el GIF sleeping continuamente"""
+        if not self.animando_sleeping or not self.frames_sleeping:
+            return
+        
+        if not self.modo_sleeping:
+            return
+        
+        try:
+            self.label_gif.config(image=self.frames_sleeping[self.frame_actual_sleeping])
+            self.frame_actual_sleeping = (self.frame_actual_sleeping + 1) % len(self.frames_sleeping)
+            self.ventana.after(5, self._animar_gif_sleeping)
+        except Exception as e:
+            print(f"⚠️ Error en animación sleeping: {e}")
+            self.animando_sleeping = False
+        
     def mostrar_nombre(self, nombre: str):
         """Mostrar el nombre del usuario en grande"""
         if self.estado_actual == self.ESTADO_NOMBRE and self.label_nombre['text'] == nombre:
