@@ -154,20 +154,27 @@ class RobotDodoUnificado:
         self.audio.hablar("Hola, aquí estoy.")
         time.sleep(0.5)
         
-        # ========== AGREGAR ESTA SECCIÓN COMPLETA ==========
-        # Preguntar cómo está el niño
-        self._preguntar_estado_animo()
-        # ===================================================
-        
         try:
-            # PASO 1: Identificación (mostrará nombre cuando se obtenga)
+            # PASO 1: Identificación
             persona = self.identificar_usuario()
             
             if persona:
-                # PASO 2: Ejercicios (mostrará imágenes + palabras)
+                # Calcular número de sesión
+                sesiones_previas = self.db.obtener_sesiones_por_persona(persona.person_id)
+                numero_sesion = len(sesiones_previas) + 1
+                
+                # ========== AHORA SÍ PREGUNTAR ESTADO (CON GRABACIÓN) ==========
+                self._preguntar_estado_animo(persona, numero_sesion)
+                # ================================================================
+                
+                # PASO 2: Ejercicios
                 self.service.realizar_sesion_ejercicios(persona)
                 
-                # PASO 3: Despedida (volverá a eyes.gif)
+                # ========== PREGUNTAR OPINIÓN (CON GRABACIÓN) ==========
+                self._preguntar_opinion_sesion(persona, numero_sesion)
+                # ========================================================
+                
+                # PASO 3: Despedida
                 self.despedida()
         
         except Exception as e:
@@ -185,11 +192,11 @@ class RobotDodoUnificado:
             print("─"*70 + "\n")
             time.sleep(2)
     
-    def _preguntar_estado_animo(self):
-        """Preguntar al niño cómo se encuentra y dar respuesta de ánimo"""
+    def _preguntar_estado_animo(self, persona, numero_sesion):
+        """Preguntar al niño cómo se encuentra y GRABAR su respuesta"""
         from chatopenai import consultar
         
-        print("\n💬 === PREGUNTA DE ÁNIMO ===")
+        print("\n💬 === PREGUNTA DE ÁNIMO (CON GRABACIÓN) ===")
         
         # Hacer la pregunta
         if self.interfaz:
@@ -203,16 +210,23 @@ class RobotDodoUnificado:
 
         self.audio.hablar(pregunta)
         
-        # Escuchar respuesta del niño
-        print("👂 Escuchando respuesta...")
-        respuesta = self.audio.escuchar(timeout=10, phrase_time_limit=10)
+        # ========== GRABAR Y ESCUCHAR SIMULTÁNEAMENTE ==========
+        print(f"🎙️ Grabando comentario inicial...")
+        respuesta, audio_path = self.audio.grabar_y_escuchar(
+            duracion=10,  # 10 segundos para dar tiempo a responder
+            person_id=persona.person_id,
+            exercise_id=0,  # 0 porque no es un ejercicio
+            ejercicio_nombre="COMENTARIO_INICIAL",
+            nivel_actual=persona.nivel_actual.name,
+            numero_sesion=numero_sesion
+        )
         
         if respuesta:
             print(f"📢 El niño dijo: '{respuesta}'")
+            if audio_path:
+                print(f"✅ Audio guardado en: {audio_path}")
             
             # Generar respuesta de ánimo personalizada con IA
-            from chatopenai import consultar
-            
             if "triste" in respuesta.lower() or "mal" in respuesta.lower():
                 mensaje_animo = consultar(
                     "El niño está triste o no se siente bien. "
@@ -238,8 +252,76 @@ class RobotDodoUnificado:
             time.sleep(1)
         else:
             print("⚠️ No se escuchó respuesta")
+            if audio_path:
+                print(f"⚠️ Audio grabado pero sin texto reconocido: {audio_path}")
             # Mensaje genérico si no responde
             self.audio.hablar("Está bien. Vamos a empezar entonces.")
+            time.sleep(0.5)
+        
+        print()
+    
+    def _preguntar_opinion_sesion(self, persona, numero_sesion):
+        """Preguntar al niño qué le pareció la sesión y GRABAR su respuesta"""
+        from chatopenai import consultar
+        
+        print("\n💬 === OPINIÓN DE LA SESIÓN (CON GRABACIÓN) ===")
+        
+        # Hacer la pregunta
+        if self.interfaz:
+            self.interfaz.mostrar_eyes()
+        
+        pregunta = consultar(
+            "Di una pregunta muy breve para preguntar a un niño qué le pareció la sesión de ejercicios. "
+            "Máximo 1 frase corta.",
+            contexto="Eres un robot amigable que quiere saber cómo se sintió el niño"
+        )
+        
+        self.audio.hablar(pregunta)
+        
+        # ========== GRABAR Y ESCUCHAR SIMULTÁNEAMENTE ==========
+        print(f"🎙️ Grabando comentario final...")
+        respuesta, audio_path = self.audio.grabar_y_escuchar(
+            duracion=10,  # 10 segundos para dar tiempo a responder
+            person_id=persona.person_id,
+            exercise_id=0,  # 0 porque no es un ejercicio
+            ejercicio_nombre="COMENTARIO_FINAL",
+            nivel_actual=persona.nivel_actual.name,
+            numero_sesion=numero_sesion
+        )
+        
+        if respuesta:
+            print(f"📢 El niño dijo: '{respuesta}'")
+            if audio_path:
+                print(f"✅ Audio guardado en: {audio_path}")
+            
+            # Generar respuesta apropiada con IA
+            if any(palabra in respuesta.lower() for palabra in ["bien", "bueno", "me gustó", "divertido", "genial"]):
+                mensaje_respuesta = consultar(
+                    "El niño disfrutó la sesión. "
+                    "Celebra su opinión positiva de forma breve."
+                )
+            elif any(palabra in respuesta.lower() for palabra in ["difícil", "cansado", "aburrido", "no me gustó"]):
+                mensaje_respuesta = consultar(
+                    "El niño encontró la sesión difícil o no le gustó mucho. "
+                    "Dale ánimo y dile que mejorará con práctica. Respuesta breve."
+                )
+            else:
+                mensaje_respuesta = consultar(
+                    f"El niño respondió sobre la sesión: '{respuesta}'. "
+                    "Da una respuesta apropiada y motivadora. Breve."
+                )
+            
+            print(f"🤖 Respuesta generada: {mensaje_respuesta}")
+            
+            # Dar la respuesta
+            self.audio.hablar(mensaje_respuesta)
+            time.sleep(1)
+        else:
+            print("⚠️ No se escuchó respuesta")
+            if audio_path:
+                print(f"⚠️ Audio grabado pero sin texto reconocido: {audio_path}")
+            # Mensaje genérico si no responde
+            self.audio.hablar("Está bien. Espero que hayas disfrutado la sesión.")
             time.sleep(0.5)
         
         print()

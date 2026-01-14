@@ -332,9 +332,25 @@ class RobotServiceInterfazUnificada:
         # Almacenar nivel
         self.db.actualizar_nivel_persona(persona.person_id, nivel)
         persona.nivel_actual = nivel
-        
+
         self.audio.hablar(f"Muy bien. Tu nivel es: {nivel.name}")
-        
+
+        # ========== MENSAJE MOTIVADOR DEL NIVEL ==========
+        time.sleep(1)
+
+        # Generar mensaje motivador según el nivel
+        mensaje_motivador = consultar(
+            f"El niño {persona.name} está en el nivel {nivel.name}. "
+            f"Explícale brevemente qué tipo de ejercicios hará en este nivel y motívalo a comenzar. "
+            f"Máximo 2 frases cortas y simples.",
+            contexto=f"Nivel {nivel.name}: ejercicios apropiados para su capacidad"
+        )
+
+        print(f"💬 Mensaje motivador: {mensaje_motivador}")
+        self.audio.hablar(mensaje_motivador)
+        time.sleep(1)
+        # ==================================================
+
         print(f"✅ Nivel asignado: {nivel.name}")
         print(f"🎙️ Audios del test grabados en: audio_registros/{persona.person_id}/\n")
         return nivel
