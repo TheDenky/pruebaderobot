@@ -431,6 +431,113 @@ Considera frases como:
                 "frustracion": "Descansemos un momento, está bien 💙"
             }
             return fallbacks.get(contexto, fallbacks["exito"])
+    
+    def detectar_intencion_panel_admin(self, texto: str) -> bool:
+        """
+        Detecta si el usuario quiere acceder al panel de administrador
+        
+        Returns:
+            True si quiere acceder al panel, False en caso contrario
+        """
+        if not texto or not texto.strip():
+            return False
+        
+        prompt = f"""
+    Analiza si el usuario quiere ACCEDER AL PANEL DE ADMINISTRADOR/TERAPEUTA con esta frase.
+    Frase del usuario: "{texto}"
+
+    El panel de administrador puede ser referido como:
+    - "panel de administrador"
+    - "panel de terapeuta"
+    - "interfaz de administrador"
+    - "quiero ver el panel"
+    - "abre la interfaz de terapeuta"
+    - "modo administrador"
+    - "configuración de terapeuta"
+    - cualquier frase similar que indique querer acceder a funciones administrativas
+
+    Responde SOLO: si o no
+
+    Ejemplos:
+    "interfaz de administrador" → si
+    "panel terapeuta" → si
+    "quiero ver el progreso de los niños" → si
+    "abre configuración" → si
+    "hola robot" → no
+    "vamos a practicar" → no
+    """
+
+        try:
+            respuesta = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=5,
+                temperature=0.1
+            )
+            
+            resultado = respuesta.choices[0].message.content.strip().lower()
+            return 'si' in resultado
+            
+        except Exception as e:
+            print(f"❌ Error en detectar_intencion_panel_admin: {e}")
+            # Fallback: buscar palabras clave
+            texto_lower = texto.lower()
+            palabras_clave = ['panel', 'administrador', 'terapeuta', 'interfaz', 'configuración']
+            return any(palabra in texto_lower for palabra in palabras_clave)
+
+    def detectar_salir_panel_admin(self, texto: str) -> bool:
+        """
+        Detecta si el usuario quiere SALIR del panel de administrador
+        
+        Returns:
+            True si quiere salir, False en caso contrario
+        """
+        if not texto or not texto.strip():
+            return False
+        
+        prompt = f"""
+    Analiza si el usuario quiere SALIR/CERRAR el panel de administrador con esta frase.
+    Frase del usuario: "{texto}"
+
+    Frases que indican querer salir:
+    - "salir"
+    - "cerrar"
+    - "volver"
+    - "terminar"
+    - "atrás"
+    - "regresa"
+    - "cierra el panel"
+    - "ya terminé"
+    - cualquier frase que indique querer cerrar o salir
+
+    Responde SOLO: si o no
+
+    Ejemplos:
+    "salir" → si
+    "cerrar panel" → si
+    "volver atrás" → si
+    "ya terminé" → si
+    "cambiar nivel" → no
+    "ver pacientes" → no
+    """
+
+        try:
+            respuesta = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=5,
+                temperature=0.1
+            )
+            
+            resultado = respuesta.choices[0].message.content.strip().lower()
+            return 'si' in resultado
+            
+        except Exception as e:
+            print(f"❌ Error en detectar_salir_panel_admin: {e}")
+            # Fallback: buscar palabras clave
+            texto_lower = texto.lower()
+            palabras_salida = ['salir', 'cerrar', 'volver', 'terminar', 'atrás', 'regresa']
+            return any(palabra in texto_lower for palabra in palabras_salida)
 
 
 # Instancia global
@@ -476,3 +583,13 @@ def detectar_salir(texto: str) -> bool:
 def feedback_motivador(contexto: str) -> str:
     """Genera feedback motivador"""
     return _asistente_inteligente.generar_feedback_motivador(contexto)
+
+
+def detectar_panel_admin(texto: str) -> bool:
+    """Detecta intención de acceder al panel de administrador"""
+    return _asistente_inteligente.detectar_intencion_panel_admin(texto)
+
+
+def detectar_salir_panel(texto: str) -> bool:
+    """Detecta intención de salir del panel de administrador"""
+    return _asistente_inteligente.detectar_salir_panel_admin(texto)

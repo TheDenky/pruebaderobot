@@ -27,6 +27,8 @@ class RobotDodoUnificado:
         self.service = None
         self.interfaz = None
         self.hilo_escucha = None
+        self.modo_administrador = False
+        self.panel_admin = None
     
     def inicializar(self):
         """Inicializar todos los componentes"""
@@ -77,20 +79,41 @@ class RobotDodoUnificado:
         
         def escucha_continua():
             """Función que corre en hilo separado"""
+            from chatopenai import detectar_panel_admin
             import time as time_module
             ultima_actividad = time_module.time()
             sleeping = False
             
             while self.activo:
                 try:
+                    # VERIFICAR MODO ADMINISTRADOR
+                    if self.modo_administrador:
+                        # Esperar a que se cierre el panel
+                        if self.panel_admin and self.panel_admin.modo_admin_activo:
+                            time_module.sleep(1)
+                            continue
+                        else:
+                            # Panel cerrado, desactivar modo admin
+                            print("\n✅ Panel cerrado - volviendo a modo normal\n")
+                            self.modo_administrador = False
+                            ultima_actividad = time_module.time()
+                            
+                            if self.interfaz:
+                                self.interfaz.mostrar_eyes()
+                            sleeping = False
+                            
+                            self.audio.hablar("Volviendo a modo normal. Di hola robot si me necesitas.")
+                            time_module.sleep(2)
+                            continue
+                    
                     hora = datetime.now().strftime('%H:%M:%S')
                     print(f"[{hora}] 👂 Escuchando... (di '{Config.ACTIVATION_WORD}' o 'adiós')")
                     
                     texto = self.audio.escuchar(timeout=Config.AUDIO_TIMEOUT)
 
-                    # Verificar inactividad (60 segundos)
+                    # Verificar inactividad
                     tiempo_inactivo = time_module.time() - ultima_actividad
-                    if tiempo_inactivo >= 5 and not sleeping:
+                    if tiempo_inactivo >= 60 and not sleeping:
                         hora = datetime.now().strftime('%H:%M:%S')
                         print(f"[{hora}] 💤 Inactividad detectada. Modo sleeping...")
                         if self.interfaz:
@@ -98,46 +121,52 @@ class RobotDodoUnificado:
                         sleeping = True
 
                     if texto:
-                        
-                        
                         texto_lower = texto.lower()
                         print(f"[{hora}] 📢 Escuché: '{texto}'")
                         
+                        # ===== DETECCIÓN CON IA: PANEL DE TERAPEUTA =====
+                        if detectar_panel_admin(texto):
+                            print(f"[{hora}] 🩺 ¡DETECTADA INTENCIÓN DE ABRIR PANEL!\n")
+                            ultima_actividad = time_module.time()
+                            
+                            if sleeping:
+                                if self.interfaz:
+                                    self.interfaz.mostrar_eyes()
+                                sleeping = False
+                            
+                            self.abrir_panel_terapeuta()
+                            continue
+                        # ===============================================
+                        
                         # Detectar palabras de salida
-                        if any(palabra in texto_lower for palabra in Config.EXIT_WORDS):
+                        elif any(palabra in texto_lower for palabra in Config.EXIT_WORDS):
                             print(f"[{hora}] 👋 ¡COMANDO DE SALIDA!\n")
                             self.apagar()
                             break
                         
                         # Detectar palabra de activación
                         elif Config.ACTIVATION_WORD in texto_lower:
-                            
-                            # Resetear temporizador de inactividad
                             ultima_actividad = time_module.time()
                             
-                            # Si estaba durmiendo, despertar
                             if sleeping:
                                 hora = datetime.now().strftime('%H:%M:%S')
                                 print(f"[{hora}] 👁️ Despertando...")
-                                print("Self intefaz:", self.interfaz)
                                 if self.interfaz:
                                     self.interfaz.mostrar_eyes()
                                 sleeping = False
-                                print("Estado de Sleeping:", sleeping)
                                 
                             print(f"[{hora}] ✅ ¡ROBOT ACTIVADO!\n")
-                            # Ejecutar modo activo en el mismo hilo
                             self.modo_activo()
                         else:
                             print(f"[{hora}] ⭕ Esperando '{Config.ACTIVATION_WORD}'...\n")
                     else:
                         print(f"[{hora}] ⏱️ Silencio...\n")
                     
-                    time.sleep(0.3)
+                    time_module.sleep(0.3)
                     
                 except Exception as e:
                     print(f"\n⚠️ Error en escucha: {e}\n")
-                    time.sleep(1)
+                    time_module.sleep(1)
         
         # Iniciar escucha en hilo separado
         self.hilo_escucha = threading.Thread(target=escucha_continua, daemon=True)
@@ -145,6 +174,12 @@ class RobotDodoUnificado:
     
     def modo_activo(self):
         """Modo activo: proceso completo de identificación y ejercicios"""
+        
+        # VERIFICAR MODO ADMINISTRADOR
+        if self.modo_administrador:
+            print("⚠️ Modo administrador activo - bloqueando proceso normal")
+            self.audio.hablar("Primero debes cerrar el panel de administrador.")
+            return
         
         print("╔" + "═"*68 + "╗")
         print("║" + " "*25 + "ROBOT ACTIVADO" + " "*29 + "║")
@@ -361,6 +396,36 @@ class RobotDodoUnificado:
                 print("➡️ No encontrado - Registrando como nuevo\n")
                 self.audio.hablar("Vamos a registrarte.")
                 return self.service.registrar_nuevo_usuario()
+    
+    def abrir_panel_terapeuta(self):
+        """Abrir panel de administración del terapeuta"""
+        print("\n🩺 === ABRIENDO PANEL DE TERAPEUTA ===\n")
+        
+        # Activar modo administrador (bloquea proceso normal)
+        self.modo_administrador = True
+        
+        # Confirmación por voz
+        self.audio.hablar("Abriendo panel de terapeuta.")
+        
+        try:
+            from panel_terapeuta import PanelTerapeuta
+            
+            # Crear panel con referencia al audio
+            self.panel_admin = PanelTerapeuta(self.db, self.audio)
+            self.panel_admin.crear()
+            
+            print("✅ Panel de terapeuta abierto")
+            print("⚠️ Modo administrador ACTIVO - proceso normal bloqueado")
+            print("   Di 'salir' o 'cerrar' para volver al modo normal\n")
+            
+            # Esperar a que se cierre el panel
+            # (el panel tiene su propio mainloop)
+            
+        except Exception as e:
+            print(f"❌ Error al abrir panel: {e}")
+            import traceback
+            traceback.print_exc()
+            self.modo_administrador = False
     
     def despedida(self):
         """Despedida después de completar sesión"""
