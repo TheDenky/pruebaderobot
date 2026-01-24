@@ -38,6 +38,11 @@ class InterfazUnificada:
         self.animando_sleeping = False
         self.modo_sleeping = False
         
+        # Widgets para celebration.gif
+        self.frames_celebration = []
+        self.frame_actual_celebration = 0
+        self.animando_celebration = False
+        
         # Widgets para mostrar nombre
         self.label_nombre = None
         
@@ -192,6 +197,57 @@ class InterfazUnificada:
         
         self.ventana.update()
     
+    def mostrar_celebracion(self, duracion_segundos=2):
+        """
+        Mostrar GIF de celebración durante un tiempo específico
+        
+        Args:
+            duracion_segundos: Cuánto tiempo mostrar la celebración (default: 2 segundos)
+        """
+        print("🎉 ¡CELEBRACIÓN!")
+        
+        # Detener otras animaciones
+        self.animando_gif = False
+        self.animando_sleeping = False
+        self.modo_sleeping = False
+        
+        # Limpiar contenedor
+        self._limpiar_contenedor()
+        
+        # Mostrar label del GIF
+        self.label_gif.pack(expand=True)
+        
+        # Cargar GIF de celebración si no está cargado
+        if not self.frames_celebration:
+            if not self._cargar_celebration_gif():
+                # Si no se puede cargar el GIF, mostrar texto de celebración
+                self.label_gif.config(
+                    text="🎉 ¡EXCELENTE! 🎉\n⭐ ¡LO HICISTE! ⭐",
+                    font=('Comic Sans MS', 72, 'bold'),
+                    fg='#FFD700',  # Dorado
+                    bg='black'
+                )
+                self.ventana.update()
+                
+                # Volver a eyes.gif después del tiempo especificado
+                self.ventana.after(int(duracion_segundos * 1000), self.mostrar_eyes)
+                return
+        
+        # Iniciar animación de celebración
+        self.animando_celebration = True
+        self.frame_actual_celebration = 0
+        self._animar_celebration_gif()
+        
+        # Programar retorno a eyes.gif después del tiempo especificado
+        self.ventana.after(int(duracion_segundos * 1000), self._fin_celebracion)
+        
+        self.ventana.update()
+
+    def _fin_celebracion(self):
+        """Terminar celebración y volver a eyes.gif"""
+        self.animando_celebration = False
+        self.mostrar_eyes()
+    
     def _cargar_gif(self, ruta_gif, sleeping=False):
         """Cargar frames del GIF"""
         if not os.path.exists(ruta_gif):
@@ -246,6 +302,65 @@ class InterfazUnificada:
             print(f"❌ Error al cargar GIF: {e}")
             return False
     
+    def _cargar_celebration_gif(self, ruta_gif='celebration.gif'):
+        """Cargar frames del GIF de celebración"""
+        if not os.path.exists(ruta_gif):
+            print(f"⚠️ No se encontró {ruta_gif}")
+            return False
+        
+        try:
+            gif = Image.open(ruta_gif)
+            
+            # Obtener tamaño de pantalla
+            screen_width = self.ventana.winfo_screenwidth()
+            screen_height = self.ventana.winfo_screenheight()
+            
+            # Usar 60% de la pantalla para el GIF
+            max_width = int(screen_width * 0.6)
+            max_height = int(screen_height * 0.6)
+            
+            # Extraer frames
+            self.frames_celebration = []
+            try:
+                while True:
+                    frame = gif.copy()
+                    frame.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
+                    photo = ImageTk.PhotoImage(frame)
+                    self.frames_celebration.append(photo)
+                    gif.seek(len(self.frames_celebration))
+            except EOFError:
+                pass
+            
+            if len(self.frames_celebration) == 0:
+                print("⚠️ No se pudieron extraer frames del GIF de celebración")
+                return False
+            
+            print(f"✅ GIF de celebración cargado: {len(self.frames_celebration)} frames")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error al cargar GIF de celebración: {e}")
+            return False
+    
+    def _animar_celebration_gif(self):
+        """Animar el GIF de celebración"""
+        if not self.animando_celebration or not self.frames_celebration:
+            return
+        
+        try:
+            # Mostrar frame actual
+            self.label_gif.config(image=self.frames_celebration[self.frame_actual_celebration])
+            
+            # Avanzar al siguiente frame
+            self.frame_actual_celebration = (self.frame_actual_celebration + 1) % len(self.frames_celebration)
+            
+            # Programar siguiente frame (60ms para animación fluida)
+            self.ventana.after(60, self._animar_celebration_gif)
+            
+        except Exception as e:
+            print(f"⚠️ Error en animación de celebración: {e}")
+            self.animando_celebration = False
+        
     def _animar_gif(self):
         """Animar el GIF continuamente"""
         if not self.animando_gif or not self.frames_gif:

@@ -626,16 +626,33 @@ class RobotServiceInterfazUnificada:
             feedback_ia = "No logré escucharte, pero está bien. Sigamos."
             print("⚠️ No se pudo evaluar (sin texto reconocido)")
         
-        # Feedback visual EN EL EJERCICIO
-        if self.interfaz:
-            self.interfaz.mostrar_feedback_ejercicio(correcto)
-        
+        # Feedback visual y verbal
         if correcto:
             self.estrellas_sesion += 1
-        
-        # Dar feedback verbal
-        self.audio.hablar(feedback_ia)
-        time.sleep(0.5)
+            
+            # ========== MOSTRAR CELEBRACIÓN ==========
+            if self.interfaz:
+                # 1. Mostrar feedback visual en el ejercicio (cambio de color)
+                self.interfaz.mostrar_feedback_ejercicio(correcto)
+                time.sleep(0.3)  # Breve pausa para ver el cambio de color
+                
+                # 2. Mostrar GIF de celebración (2 segundos)
+                self.interfaz.mostrar_celebracion(duracion_segundos=2)
+            
+            # 3. Dar feedback verbal MIENTRAS se muestra la celebración
+            self.audio.hablar(feedback_ia)
+            
+            # 4. Esperar a que termine el GIF (ya programado en mostrar_celebracion)
+            time.sleep(2.5)  # GIF (2s) + pausa (0.5s)
+            
+        else:
+            # Si está incorrecto, solo mostrar feedback visual
+            if self.interfaz:
+                self.interfaz.mostrar_feedback_ejercicio(correcto)
+            
+            # Dar feedback verbal
+            self.audio.hablar(feedback_ia)
+            time.sleep(0.5)
         
         # Crear resultado con la ruta del audio
         return ResultadoEjercicio(
