@@ -2,10 +2,11 @@
 SERVICES CON INTERFAZ UNIFICADA Y GRABACIÓN DE AUDIO
 Usa los diferentes estados de la interfaz según el flujo
 Graba automáticamente los audios de cada ejercicio de forma organizada
-MODIFICADO: Test diagnóstico también muestra imágenes y graba audio
+VERSIÓN LIMPIA: Solo usa métodos válidos de InterfazUnificada
 """
 import time
-from typing import Optional, List
+import random
+from typing import Optional, List, Tuple
 from datetime import datetime
 from models import Persona, Ejercicio, Sesion, ResultadoEjercicio, NivelTerapia
 from database import Database
@@ -58,8 +59,6 @@ class RobotServiceInterfazUnificada:
         def validador(respuesta: str):
             return validar_si_no(respuesta)
         
-        # La interfaz mostrará eyes.gif automáticamente cuando audio.hablar() se ejecute
-        
         exito, resultado = preguntar_con_reintentos(
             audio_system=self.audio,
             pregunta="¿Es la primera vez que vienes?",
@@ -71,7 +70,7 @@ class RobotServiceInterfazUnificada:
             ],
             max_intentos=3,
             permitir_salir=False,
-            interfaz=None  # No usamos interfaz de texto
+            interfaz=None
         )
         
         if not exito:
@@ -88,7 +87,7 @@ class RobotServiceInterfazUnificada:
         
         # Saludo personalizado
         saludo = consultar("Di un saludo corto para un niño nuevo que viene a terapia de habla")
-        self.audio.hablar(saludo)  # Automáticamente muestra eyes.gif
+        self.audio.hablar(saludo)
         time.sleep(1)
         
         # === NOMBRE ===
@@ -106,9 +105,9 @@ class RobotServiceInterfazUnificada:
         # MOSTRAR EL NOMBRE EN LA INTERFAZ
         if self.interfaz:
             self.interfaz.mostrar_nombre(nombre)
-            time.sleep(3)  # Dar tiempo para ver el nombre
+            time.sleep(3)
         
-        # Confirmar nombre (mostrará eyes.gif al hablar)
+        # Confirmar nombre
         self.audio.hablar(f"Mucho gusto, {nombre}.")
         time.sleep(0.5)
         
@@ -158,13 +157,74 @@ class RobotServiceInterfazUnificada:
         
         # MOSTRAR EDAD
         if self.interfaz:
-            self.interfaz.mostrar_nombre(edad)
-            time.sleep(4)
+            self.interfaz.mostrar_nombre(f"{edad} años")
+            time.sleep(2)
+        
+        # === SEXO ===
+        if self.interfaz:
+            self.interfaz.mostrar_eyes()
+        
+        def validador_sexo(respuesta: str) -> Tuple[bool, str]:
+            respuesta_lower = respuesta.lower()
+            if any(palabra in respuesta_lower for palabra in ['masculino', 'hombre', 'niño', 'varón', 'macho']):
+                return True, 'M'
+            elif any(palabra in respuesta_lower for palabra in ['femenino', 'mujer', 'niña', 'hembra']):
+                return True, 'F'
+            return False, None
+        
+        exito, sexo = preguntar_con_reintentos(
+            audio_system=self.audio,
+            pregunta="¿Eres niño o niña?",
+            validador=validador_sexo,
+            mensajes_reintento=[
+                "¿Eres niño o niña?",
+                "Dime si eres niño o niña.",
+                "Niño o niña, por favor."
+            ],
+            max_intentos=3,
+            permitir_salir=False,
+            interfaz=None
+        )
+        
+        if not exito or not sexo:
+            sexo = None
+            print("⚠️ No se obtuvo sexo")
+        else:
+            print(f"✅ Sexo obtenido: {sexo}")
+        
+#         # === DNI (OPCIONAL) ===
+#         if self.interfaz:
+#             self.interfaz.mostrar_eyes()
+#         
+#         self.audio.hablar("Ahora necesito tu DNI o documento de identidad. Si no lo sabes, di 'no sé'.")
+#         
+#         dni_texto = escuchar_con_reintentos(
+#             audio_system=self.audio,
+#             mensaje_inicial="Escuchando DNI...",
+#             max_intentos=2,
+#             interfaz=None
+#         )
+#         
+#         dni = None
+#         if dni_texto and 'no' not in dni_texto.lower():
+#             # Extraer números del texto
+#             import re
+#             numeros = re.findall(r'\d+', dni_texto)
+#             if numeros:
+#                 dni = ''.join(numeros)
+#                 print(f"✅ DNI obtenido: {dni}")
+#             else:
+#                 print("⚠️ No se pudo extraer DNI")
+#         else:
+#             print("⚠️ DNI no proporcionado")
         
         # === CONFIRMACIÓN ===
+        sexo_texto = "niño" if sexo == 'M' else "niña" if sexo == 'F' else "persona"
+        dni_texto_confirmacion = f", DNI {dni}" if dni else ""
+        
         confirmado = confirmar_con_usuario(
             audio_system=self.audio,
-            mensaje_confirmacion=f"Tu nombre es {nombre_completo}, tienes {edad} años. ¿Es correcto?",
+            mensaje_confirmacion=f"Tu nombre es {nombre_completo}, tienes {edad} años, eres {sexo_texto}{dni_texto_confirmacion}. ¿Es correcto?",
             interfaz=None
         )
         
@@ -175,7 +235,12 @@ class RobotServiceInterfazUnificada:
         # === GUARDAR EN BASE DE DATOS ===
         self.audio.hablar("Perfecto. Guardando tus datos.")
         
-        persona = Persona(name=nombre_completo, age=edad)
+        persona = Persona(
+            name=nombre_completo, 
+            age=edad,
+            dni=dni,
+            sex=sexo
+        )
         person_id = self.db.crear_persona(persona)
         persona.person_id = person_id
         
@@ -196,63 +261,53 @@ class RobotServiceInterfazUnificada:
         self.audio.hablar(f"Hola {persona.name}. Vamos a hacer un pequeño test.")
         time.sleep(1)
         
-        # Test completo - usar palabras que tienen imagen en la BD
-        palabras_test = [
-            # Nivel INICIAL
-            "MAMÁ", "PAPÁ",
-            # Nivel BASICO
-            "BOCA", "PATO",
-            # Nivel INTERMEDIO
-            "CASA", "GATO",
-            # Nivel AVANZADO
-            "LORO", "PERRO"
-        ]
+        # Obtener TODOS los ejercicios de TODOS los niveles
+        print("🔍 Obteniendo ejercicios de todos los niveles para el test...")
+        todos_ejercicios = self.db.obtener_todos_ejercicios()
+
+        # Verificar que hay al menos 6 ejercicios
+        if len(ejercicios_disponibles) < 6:
+            print(f"⚠️ Solo hay {len(ejercicios_disponibles)} ejercicios disponibles")
+            ejercicios_test = ejercicios_disponibles
+        else:
+            # Seleccionar 6 ejercicios ALEATORIOS sin repetición
+            ejercicios_test = random.sample(ejercicios_disponibles, 6)
+
+        print(f"🔀 Test con {len(ejercicios_test)} ejercicios aleatorios")
+        print("📝 Ejercicios seleccionados:")
+        for ej in ejercicios_test:
+            print(f"   • {ej.word} (Nivel: {ej.nivel.name})")
+        print()
         
         aciertos = 0
         totalConfianza = 0
-        total = len(palabras_test)
+        total = len(ejercicios_test)
         
-        for i, palabra in enumerate(palabras_test, 1):
-            print(f"\n--- Test {i}/{total}: {palabra} ---")
-            
-            # Buscar el ejercicio en la BD para obtener la imagen
-            ejercicio_test = None
-            ejercicios_bd = self.db.obtener_todos_ejercicios()
-            for ej in ejercicios_bd:
-                if ej.word.upper() == palabra.upper():
-                    ejercicio_test = ej
-                    break
-            
-            # MOSTRAR EJERCICIO (imagen + palabra)
-#             if self.interfaz:
-#                 ruta_imagen = ejercicio_test.apoyo_visual if ejercicio_test and ejercicio_test.apoyo_visual else None
-#                 self.interfaz.mostrar_ejercicio(
-#                     palabra=palabra,
-#                     ruta_imagen=ruta_imagen
-#                 )
+        for i, ejercicio_actual in enumerate(ejercicios_test, 1):
+            print(f"\n--- Test {i}/{total}: {ejercicio_actual.word} (Nivel: {ejercicio_actual.nivel.name}) ---")
             
             # Dar instrucción (mostrará eyes.gif automáticamente)
-            self.audio.hablar(f"Repite: {palabra}")
-            
+            self.audio.hablar(f"Repite: {ejercicio_actual.word}")
+
             # VOLVER A MOSTRAR EJERCICIO después de hablar
             if self.interfaz:
-                ruta_imagen = ejercicio_test.apoyo_visual if ejercicio_test and ejercicio_test.apoyo_visual else None
+                ruta_imagen = ejercicio_actual.apoyo_visual if ejercicio_actual.apoyo_visual else None
                 self.interfaz.mostrar_ejercicio(
-                    palabra=palabra,
+                    palabra=ejercicio_actual.word,
                     ruta_imagen=ruta_imagen
                 )
             
             time.sleep(0.5)
             
             # === GRABAR Y EVALUAR SIMULTÁNEAMENTE ===
-            print(f"🎙️ Grabando audio del test: {palabra}")
+            print(f"🎙️ Grabando audio del test: {ejercicio_actual.word}")
             
             # Grabar y escuchar
             respuesta, audio_path = self.audio.grabar_y_escuchar(
                 duracion=Config.RECORDING_DURATION,
                 person_id=persona.person_id,
-                exercise_id=ejercicio_test.exercise_id if ejercicio_test else 0,
-                ejercicio_nombre=f"TEST_{palabra}",
+                exercise_id=ejercicio_actual.exercise_id,
+                ejercicio_nombre=f"TEST_{ejercicio_actual.word}",
                 nivel_actual="DIAGNOSTICO",
                 numero_sesion=0
             )
@@ -262,14 +317,12 @@ class RobotServiceInterfazUnificada:
                 print("⚠️ Primera grabación sin texto reconocido, dando otra oportunidad...")
                 self.audio.hablar("No te escuché bien. Intenta una vez más.")
                 
-                # Dar instrucción (mostrará eyes.gif automáticamente)
-                self.audio.hablar(f"{palabra}")
-                
-                # VOLVER A MOSTRAR EJERCICIO después de hablar
+                self.audio.hablar(f"{ejercicio_actual.word}")
+
                 if self.interfaz:
-                    ruta_imagen = ejercicio_test.apoyo_visual if ejercicio_test and ejercicio_test.apoyo_visual else None
+                    ruta_imagen = ejercicio_actual.apoyo_visual if ejercicio_actual.apoyo_visual else None
                     self.interfaz.mostrar_ejercicio(
-                        palabra=palabra,
+                        palabra=ejercicio_actual.word,
                         ruta_imagen=ruta_imagen
                     )
                 
@@ -279,8 +332,8 @@ class RobotServiceInterfazUnificada:
                 respuesta, audio_path_2 = self.audio.grabar_y_escuchar(
                     duracion=Config.RECORDING_DURATION,
                     person_id=persona.person_id,
-                    exercise_id=ejercicio_test.exercise_id if ejercicio_test else 0,
-                    ejercicio_nombre=f"TEST_{palabra}",
+                    exercise_id=ejercicio_actual.exercise_id,
+                    ejercicio_nombre=f"TEST_{ejercicio_actual.word}",
                     nivel_actual="DIAGNOSTICO",
                     numero_sesion=0
                 )
@@ -290,9 +343,8 @@ class RobotServiceInterfazUnificada:
             
             # Evaluar respuesta con IA
             if respuesta:
-                correcto, confianza, feedback_ia = comparar_palabras(palabra, respuesta)
-                totalConfianza+=confianza
-                print("Confiaza acumulada:", totalConfianza)
+                correcto, confianza, feedback_ia = comparar_palabras(ejercicio_actual.word, respuesta)
+                totalConfianza += confianza
                 print(f"📊 Evaluación: correcto={correcto}, confianza={confianza:.2f}")
                 print(f"💬 Feedback IA: {feedback_ia}")
             else:
@@ -317,8 +369,8 @@ class RobotServiceInterfazUnificada:
         
         # Clasificación
         tasa_exito = aciertos / total
-        print("Total de confianza:", totalConfianza, " Evaluacion:", (totalConfianza/total))
         print(f"\n📊 Resultado test: {aciertos}/{total} ({tasa_exito*100:.0f}%)")
+        print(f"Confianza promedio: {(totalConfianza/total):.2f}")
         
         if tasa_exito >= 0.9:
             nivel = NivelTerapia.AVANZADO
@@ -332,25 +384,22 @@ class RobotServiceInterfazUnificada:
         # Almacenar nivel
         self.db.actualizar_nivel_persona(persona.person_id, nivel)
         persona.nivel_actual = nivel
-
+        
         self.audio.hablar(f"Muy bien. Tu nivel es: {nivel.name}")
-
-        # ========== MENSAJE MOTIVADOR DEL NIVEL ==========
+        
+        # Mensaje motivador del nivel
         time.sleep(1)
-
-        # Generar mensaje motivador según el nivel
         mensaje_motivador = consultar(
             f"El niño {persona.name} está en el nivel {nivel.name}. "
             f"Explícale brevemente qué tipo de ejercicios hará en este nivel y motívalo a comenzar. "
             f"Máximo 2 frases cortas y simples.",
             contexto=f"Nivel {nivel.name}: ejercicios apropiados para su capacidad"
         )
-
+        
         print(f"💬 Mensaje motivador: {mensaje_motivador}")
         self.audio.hablar(mensaje_motivador)
         time.sleep(1)
-        # ==================================================
-
+        
         print(f"✅ Nivel asignado: {nivel.name}")
         print(f"🎙️ Audios del test grabados en: audio_registros/{persona.person_id}/\n")
         return nivel
@@ -391,7 +440,7 @@ class RobotServiceInterfazUnificada:
                 self.interfaz.mostrar_nombre(persona.name)
                 time.sleep(2)
             
-            # Saludo personalizado (mostrará eyes.gif)
+            # Saludo personalizado
             saludo = consultar(
                 f"Di un saludo corto de bienvenida para {persona.name}, un niño que regresa a terapia",
                 contexto=f"El niño está en nivel {persona.nivel_actual.name}"
@@ -416,7 +465,7 @@ class RobotServiceInterfazUnificada:
         self.numero_sesion_actual = len(sesiones_previas) + 1
         print(f"📊 Sesión número: {self.numero_sesion_actual}")
         
-        # Mensaje inicial (mostrará eyes.gif)
+        # Mensaje inicial
         intro = consultar(
             "Di una frase muy corta motivando a un niño a hacer ejercicios de habla",
             contexto="Debe ser entusiasta y positivo"
@@ -436,11 +485,16 @@ class RobotServiceInterfazUnificada:
         
         print(f"📋 Total ejercicios: {len(ejercicios)}")
         
+        # ALEATORIZAR EJERCICIOS
+        random.shuffle(ejercicios)
+        print("🔀 Ejercicios aleatorizados")
+        
         # Crear sesión
         sesion = Sesion(
             person_id=persona.person_id,
             nivel=persona.nivel_actual,
             fecha=datetime.now(),
+            numero_sesion=self.numero_sesion_actual,
             ejercicios_completados=[]
         )
         
@@ -494,25 +548,12 @@ class RobotServiceInterfazUnificada:
         self, ejercicio: Ejercicio, persona: Persona, 
         num: int, total: int
     ) -> Optional[ResultadoEjercicio]:
-        """
-        Ejecutar ejercicio individual CON GRABACIÓN DE AUDIO
-        MUESTRA: imagen + palabra mientras usuario responde
-        MUESTRA: eyes.gif cuando robot habla
-        GRABA: audio del usuario con formato organizado
-        """
+        """Ejecutar ejercicio individual CON GRABACIÓN DE AUDIO"""
         
-        # MOSTRAR EJERCICIO (imagen + palabra)
-#         if self.interfaz:
-#             ruta_imagen = ejercicio.apoyo_visual if ejercicio.apoyo_visual else None
-#             self.interfaz.mostrar_ejercicio(
-#                 palabra=ejercicio.word,
-#                 ruta_imagen=ruta_imagen
-#             )
-#         
-#         # Dar instrucción (mostrará eyes.gif automáticamente)
+        # Dar instrucción
         self.audio.hablar(f"Repite: {ejercicio.word}")
         
-        # VOLVER A MOSTRAR EJERCICIO después de hablar
+        # MOSTRAR EJERCICIO después de hablar
         if self.interfaz:
             ruta_imagen = ejercicio.apoyo_visual if ejercicio.apoyo_visual else None
             self.interfaz.mostrar_ejercicio(
@@ -525,14 +566,13 @@ class RobotServiceInterfazUnificada:
         # === GRABAR Y EVALUAR SIMULTÁNEAMENTE ===
         inicio = time.time()
         
-        # Preparar parámetros para grabación
         ejercicio_nombre = ejercicio.word
         nivel_actual = persona.nivel_actual.name
         numero_sesion = self.numero_sesion_actual
         
         print(f"🎙️ Grabando audio: {ejercicio_nombre}_{nivel_actual}_sesion{numero_sesion}")
         
-        # Usar grabar_y_escuchar para hacer ambas cosas a la vez
+        # Usar grabar_y_escuchar
         respuesta, audio_path = self.audio.grabar_y_escuchar(
             duracion=Config.RECORDING_DURATION,
             person_id=persona.person_id,
@@ -551,6 +591,7 @@ class RobotServiceInterfazUnificada:
             self.audio.hablar("No te escuché bien. Intenta una vez más.")
             
             self.audio.hablar(f"{ejercicio.word}")
+            
             if self.interfaz:
                 ruta_imagen = ejercicio.apoyo_visual if ejercicio.apoyo_visual else None
                 self.interfaz.mostrar_ejercicio(
@@ -571,7 +612,6 @@ class RobotServiceInterfazUnificada:
             )
             intentos = 2
             
-            # Usar la ruta del segundo audio si existe
             if audio_path_2:
                 audio_path = audio_path_2
         
@@ -580,6 +620,7 @@ class RobotServiceInterfazUnificada:
             correcto, confianza, feedback_ia = comparar_palabras(ejercicio.word, respuesta)
             print(f"📊 Evaluación: correcto={correcto}, confianza={confianza:.2f}")
             print(f"💬 Feedback IA: {feedback_ia}")
+            print(f"📢 Respuesta: '{respuesta}'")
         else:
             correcto = False
             feedback_ia = "No logré escucharte, pero está bien. Sigamos."
@@ -592,7 +633,7 @@ class RobotServiceInterfazUnificada:
         if correcto:
             self.estrellas_sesion += 1
         
-        # Dar feedback verbal (mostrará eyes.gif)
+        # Dar feedback verbal
         self.audio.hablar(feedback_ia)
         time.sleep(0.5)
         
@@ -603,7 +644,7 @@ class RobotServiceInterfazUnificada:
             correcto=correcto,
             tiempo_respuesta=tiempo_respuesta,
             intentos=intentos,
-            audio_path=audio_path  # ¡IMPORTANTE! Guardar la ruta del audio
+            audio_path=audio_path
         )
     
     def _evaluar_progreso_con_ia(self, persona: Persona, sesion: Sesion):
@@ -628,7 +669,7 @@ class RobotServiceInterfazUnificada:
             self.db.actualizar_nivel_persona(persona.person_id, nuevo_nivel)
             persona.nivel_actual = nuevo_nivel
             
-            # Celebración (mostrará eyes.gif al hablar)
+            # Celebración
             mensaje = consultar(
                 f"Celebra que {persona.name} subió al nivel {nuevo_nivel.name}",
                 contexto="Debe ser muy motivador y celebratorio"

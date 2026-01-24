@@ -1,6 +1,7 @@
 """
 PANEL DE TERAPEUTA - Interfaz de administración
 Permite visualizar progreso y modificar niveles de usuarios
+VERSIÓN COMPLETA CON TODOS LOS MÉTODOS
 """
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
@@ -36,11 +37,17 @@ class PanelTerapeuta:
         self.tree_usuarios = None
         self.frame_detalles = None
         self.label_nombre = None
+        self.label_dni = None
         self.label_edad = None
+        self.label_sexo = None
+        self.label_fecha = None
         self.label_nivel = None
         self.combo_nivel = None
         self.text_observaciones = None
         self.canvas_grafico = None
+        self.tree_historial = None
+        self.frame_stats = None
+        self.frame_grafico = None
     
     def crear(self):
         """Crear ventana del panel"""
@@ -49,7 +56,7 @@ class PanelTerapeuta:
         self.ventana.geometry("1400x900")
         self.ventana.configure(bg=self.color_fondo)
         
-        # Hacer que se centre en la pantalla
+        # Centrar en pantalla
         self.ventana.update_idletasks()
         width = self.ventana.winfo_width()
         height = self.ventana.winfo_height()
@@ -57,10 +64,10 @@ class PanelTerapeuta:
         y = (self.ventana.winfo_screenheight() // 2) - (height // 2)
         self.ventana.geometry(f'{width}x{height}+{x}+{y}')
         
-        # NUEVO: Evento de cierre personalizado
+        # Evento de cierre
         self.ventana.protocol("WM_DELETE_WINDOW", self.cerrar)
         
-        # NUEVO: Si hay audio, iniciar escucha por voz
+        # Iniciar escucha por voz si hay audio
         if self.audio:
             import threading
             self.hilo_escucha_admin = threading.Thread(
@@ -86,7 +93,7 @@ class PanelTerapeuta:
         
         # Cargar datos iniciales
         self.cargar_usuarios()
-        
+    
     def _escuchar_comandos_voz(self):
         """Escuchar comandos de voz para salir del panel"""
         from chatopenai import detectar_salir_panel
@@ -94,18 +101,14 @@ class PanelTerapeuta:
         
         while self.modo_admin_activo:
             try:
-                # Escuchar
                 texto = self.audio.escuchar(timeout=5, phrase_time_limit=5)
                 
                 if texto:
                     print(f"🎤 [Panel Admin] Escuché: '{texto}'")
                     
-                    # Detectar intención de salir usando IA
                     if detectar_salir_panel(texto):
                         print("🚪 Detectada intención de salir del panel")
                         self.audio.hablar("Cerrando panel de administrador.")
-                        
-                        # Cerrar panel desde el hilo principal
                         self.ventana.after(100, self.cerrar)
                         break
                 
@@ -289,12 +292,33 @@ class PanelTerapeuta:
         )
         self.label_nombre.pack(side='left', padx=10)
         
-        # Edad
-        frame_edad = tk.Frame(frame, bg='white')
-        frame_edad.pack(fill='x', padx=15, pady=8)
+        # DNI
+        frame_dni = tk.Frame(frame, bg='white')
+        frame_dni.pack(fill='x', padx=15, pady=8)
         
         tk.Label(
-            frame_edad,
+            frame_dni,
+            text="DNI:",
+            font=('Arial', 11, 'bold'),
+            bg='white',
+            fg=self.color_primario
+        ).pack(side='left')
+        
+        self.label_dni = tk.Label(
+            frame_dni,
+            text="",
+            font=('Arial', 11),
+            bg='white',
+            fg='#333'
+        )
+        self.label_dni.pack(side='left', padx=10)
+        
+        # Edad y Sexo
+        frame_edad_sexo = tk.Frame(frame, bg='white')
+        frame_edad_sexo.pack(fill='x', padx=15, pady=8)
+        
+        tk.Label(
+            frame_edad_sexo,
             text="Edad:",
             font=('Arial', 11, 'bold'),
             bg='white',
@@ -302,13 +326,30 @@ class PanelTerapeuta:
         ).pack(side='left')
         
         self.label_edad = tk.Label(
-            frame_edad,
+            frame_edad_sexo,
             text="",
             font=('Arial', 11),
             bg='white',
             fg='#333'
         )
         self.label_edad.pack(side='left', padx=10)
+        
+        tk.Label(
+            frame_edad_sexo,
+            text="  |  Sexo:",
+            font=('Arial', 11, 'bold'),
+            bg='white',
+            fg=self.color_primario
+        ).pack(side='left', padx=(20, 0))
+        
+        self.label_sexo = tk.Label(
+            frame_edad_sexo,
+            text="",
+            font=('Arial', 11),
+            bg='white',
+            fg='#333'
+        )
+        self.label_sexo.pack(side='left', padx=10)
         
         # Fecha registro
         frame_fecha = tk.Frame(frame, bg='white')
@@ -570,11 +611,13 @@ class PanelTerapeuta:
                     p.personId,
                     p.name,
                     p.age,
+                    p.sex,
+                    p.dni,
                     l.name as nivel,
                     COUNT(DISTINCT s.sesionId) as num_sesiones
                 FROM person p
                 LEFT JOIN level l ON p.actual_level = l.levelId
-                LEFT JOIN sesion s ON l.levelId = s.levelId
+                LEFT JOIN sesion s ON p.personId = s.personId
                 GROUP BY p.personId
                 ORDER BY p.personId DESC
             """)
@@ -582,12 +625,14 @@ class PanelTerapeuta:
             personas = cursor.fetchall()
             
             for persona in personas:
+                sexo_icono = "👦" if persona['sex'] == 'M' else "👧" if persona['sex'] == 'F' else "👤"
+                
                 self.tree_usuarios.insert(
                     '',
                     'end',
                     values=(
                         persona['personId'],
-                        persona['name'],
+                        f"{sexo_icono} {persona['name']}",
                         f"{persona['age']} años",
                         persona['nivel'] or 'N/A',
                         persona['num_sesiones']
@@ -598,6 +643,8 @@ class PanelTerapeuta:
             
         except Exception as e:
             print(f"❌ Error al cargar usuarios: {e}")
+            import traceback
+            traceback.print_exc()
             messagebox.showerror("Error", f"No se pudieron cargar los usuarios:\n{e}")
     
     def on_seleccionar_usuario(self, event):
@@ -635,6 +682,8 @@ class PanelTerapeuta:
                 'person_id': persona_row['personId'],
                 'name': persona_row['name'],
                 'age': persona_row['age'],
+                'dni': persona_row['dni'] if 'dni' in persona_row.keys() else None,
+                'sex': persona_row['sex'] if 'sex' in persona_row.keys() else None,
                 'nivel_id': persona_row['actual_level'],
                 'nivel_nombre': persona_row['nivel_nombre'],
                 'fecha_registro': persona_row['register_date']
@@ -646,7 +695,14 @@ class PanelTerapeuta:
             
             # Actualizar información básica
             self.label_nombre.config(text=persona_row['name'])
+            
+            dni_text = persona_row['dni'] if persona_row['dni'] else "No registrado"
+            self.label_dni.config(text=dni_text)
+            
             self.label_edad.config(text=f"{persona_row['age']} años")
+            
+            sexo_text = "Masculino" if persona_row['sex'] == 'M' else "Femenino" if persona_row['sex'] == 'F' else "No registrado"
+            self.label_sexo.config(text=sexo_text)
             
             fecha_registro = persona_row['register_date']
             if fecha_registro:
@@ -669,6 +725,9 @@ class PanelTerapeuta:
             
             # Cargar gráfico de progreso
             self._cargar_grafico_progreso(person_id)
+            
+            # Cargar observaciones
+            self._cargar_observaciones(person_id)
             
             print(f"✅ Detalles cargados para: {persona_row['name']}")
             
@@ -742,7 +801,7 @@ class PanelTerapeuta:
                 return
             
             # Preparar datos
-            fechas = [s.fecha.strftime('%d/%m') for s in sesiones[-10:]]  # Últimas 10
+            fechas = [s.fecha.strftime('%d/%m') for s in sesiones[-10:]]
             tasas = [s.tasa_exito * 100 for s in sesiones[-10:]]
             
             # Crear figura
@@ -819,6 +878,18 @@ class PanelTerapeuta:
                 bg=color,
                 fg='white'
             ).pack(pady=(0, 5))
+    
+    def _cargar_observaciones(self, person_id: int):
+        """Cargar observaciones del terapeuta"""
+        try:
+            observaciones = self.db.obtener_observaciones_persona(person_id)
+            
+            if observaciones:
+                obs_reciente = observaciones[0]
+                self.text_observaciones.delete("1.0", "end")
+                self.text_observaciones.insert("1.0", obs_reciente['observacion'])
+        except Exception as e:
+            print(f"⚠️ Error al cargar observaciones: {e}")
     
     # ===== FUNCIONES DE MODIFICACIÓN =====
     
@@ -994,7 +1065,7 @@ class PanelTerapeuta:
             messagebox.showwarning("Advertencia", "No hay paciente seleccionado")
             return
         
-        # Confirmar (operación crítica)
+        # Confirmar
         respuesta = messagebox.askyesno(
             "⚠️ Confirmar Reinicio",
             f"¿REINICIAR el nivel de {self.persona_seleccionada['name']} a INICIAL?\n\n"
@@ -1044,16 +1115,23 @@ class PanelTerapeuta:
             return
         
         try:
-            # Aquí podrías guardar en una tabla de observaciones
-            # Por ahora solo mostramos confirmación
-            
-            messagebox.showinfo(
-                "Éxito",
-                "Observaciones guardadas correctamente"
+            # Guardar en tabla de observaciones
+            obs_id = self.db.crear_observacion(
+                person_id=self.persona_seleccionada['person_id'],
+                observacion=observaciones,
+                terapeuta="Sistema"
             )
             
-            print(f"✅ Observaciones guardadas para {self.persona_seleccionada['name']}")
-            print(f"📝 {observaciones}")
+            if obs_id:
+                messagebox.showinfo(
+                    "Éxito",
+                    "Observaciones guardadas correctamente"
+                )
+                
+                print(f"✅ Observaciones guardadas para {self.persona_seleccionada['name']}")
+                print(f"📝 {observaciones}")
+            else:
+                raise Exception("No se pudo guardar")
             
         except Exception as e:
             print(f"❌ Error al guardar observaciones: {e}")
@@ -1077,5 +1155,4 @@ class PanelTerapeuta:
         if self.ventana:
             self.ventana.deiconify()
             self.ventana.lift()
-            # Mantener la ventana abierta
             self.ventana.mainloop()

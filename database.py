@@ -33,9 +33,17 @@ class Database:
             cursor = self.conn.cursor()
             nivel_id = persona.nivel_actual.value
             cursor.execute('''
-                INSERT INTO person (name, age, diagnostic_level, actual_level, actual_therapy)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (persona.name, persona.age, nivel_id, nivel_id, 1))
+                INSERT INTO person (name, age, dni, sex, diagnostic_level, actual_level, actual_therapy)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                persona.name, 
+                persona.age, 
+                persona.dni,
+                persona.sex,
+                nivel_id, 
+                nivel_id, 
+                1
+            ))
             self.conn.commit()
             return cursor.lastrowid
         except Exception as e:
@@ -213,19 +221,27 @@ class Database:
             nivel_id = sesion.nivel.value
             
             cursor.execute('''
-                INSERT INTO sesion (levelId, correct_exercise, failed_exercise, observation, number)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO sesion (
+                    personId, levelId, number, 
+                    correct_exercise, failed_exercise, 
+                    observation, observaciones_terapeuta
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             ''', (
+                sesion.person_id,
                 nivel_id,
+                sesion.numero_sesion,
                 sesion.ejercicios_correctos,
                 sesion.ejercicios_fallidos,
                 sesion.observaciones,
-                1
+                sesion.observaciones_terapeuta
             ))
             self.conn.commit()
             return cursor.lastrowid
         except Exception as e:
             print(f"❌ Error al crear sesión: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def obtener_ultima_sesion(self, person_id: int) -> Optional[Sesion]:
@@ -263,8 +279,9 @@ class Database:
             cursor = self.conn.cursor()
             cursor.execute('''
                 SELECT * FROM sesion 
-                ORDER BY date DESC
-            ''')
+                WHERE personId = ?
+                ORDER BY date ASC
+            ''', (person_id,))
             rows = cursor.fetchall()
             
             sesiones = []
@@ -333,6 +350,8 @@ class Database:
             person_id=row['personId'],
             name=row['name'],
             age=row['age'],
+            dni=row['dni'] if 'dni' in row.keys() else None,
+            sex=row['sex'] if 'sex' in row.keys() else None,
             nivel_actual=nivel,
             fecha_registro=row['register_date'] if row['register_date'] else datetime.now()
         )
@@ -355,13 +374,18 @@ class Database:
         else:
             fecha = datetime.now()
         
+        # Obtener personId de la sesión o usar el proporcionado
+        session_person_id = row['personId'] if 'personId' in row.keys() and row['personId'] else person_id
+        
         return Sesion(
             sesion_id=row['sesionId'],
-            person_id=person_id,
+            person_id=session_person_id,
             nivel=nivel,
             fecha=fecha,
+            numero_sesion=row['number'] if row['number'] else 1,
             ejercicios_completados=[],
-            observaciones=row['observation'] if row['observation'] else ''
+            observaciones=row['observation'] if row['observation'] else '',
+            observaciones_terapeuta=row['observaciones_terapeuta'] if 'observaciones_terapeuta' in row.keys() else ''
         )
     
     # ========== UTILIDADES ==========
@@ -418,3 +442,60 @@ class Database:
         if self.conn:
             self.conn.close()
             print("🔒 Conexión a BD cerrada")
+    
+    # ========== OBSERVACIONES ==========
+
+    def crear_observacion(self, person_id: int, observacion: str, terapeuta: str = None) -> int:
+        """Crear nueva observación del terapeuta"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                INSERT INTO observaciones (personId, observacion, terapeuta)
+                VALUES (?, ?, ?)
+            ''', (person_id, observacion, terapeuta))
+            self.conn.commit()
+            return cursor.lastrowid
+        except Exception as e:
+            print(f"❌ Error al crear observación: {e}")
+            return None
+
+    def obtener_observaciones_persona(self, person_id: int) -> List[dict]:
+        """Obtener observaciones de una persona"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                SELECT * FROM observaciones 
+                WHERE personId = ?
+                ORDER BY fecha DESC
+            ''', (person_id,))
+            rows = cursor.fetchall()
+            
+            observaciones = []
+            for row in rows:
+                observaciones.append({
+                    'observacion_id': row['observacionId'],
+                    'person_id': row['personId'],
+                    'fecha': row['fecha'],
+                    'observacion': row['observacion'],
+                    'terapeuta': row['terapeuta']
+                })
+            
+            return observaciones
+        except Exception as e:
+            print(f"❌ Error al obtener observaciones: {e}")
+            return []
+
+    def actualizar_observaciones_sesion(self, sesion_id: int, observaciones: str):
+        """Actualizar observaciones del terapeuta en una sesión"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                UPDATE sesion 
+                SET observaciones_terapeuta = ?
+                WHERE sesionId = ?
+            ''', (observaciones, sesion_id))
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"❌ Error al actualizar observaciones: {e}")
+            return False

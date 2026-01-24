@@ -1,6 +1,7 @@
 """
 MODELOS - Entidades del dominio
 Todas las clases de datos en un solo archivo
+ACTUALIZADO: Con DNI, sexo y personId en sesiones
 """
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -22,6 +23,8 @@ class Persona:
     name: str
     age: int
     person_id: Optional[int] = None
+    dni: Optional[str] = None  # NUEVO
+    sex: Optional[str] = None  # NUEVO: 'M' o 'F'
     nivel_actual: NivelTerapia = NivelTerapia.INICIAL
     fecha_registro: datetime = field(default_factory=datetime.now)
     
@@ -35,6 +38,10 @@ class Persona:
             return False, "Nombre inválido"
         if self.age < 1 or self.age > 18:
             return False, "Edad debe estar entre 1 y 18 años"
+        if self.sex and self.sex not in ['M', 'F']:
+            return False, "Sexo debe ser 'M' o 'F'"
+        if self.dni and len(self.dni) < 8:
+            return False, "DNI inválido"
         return True, ""
 
 
@@ -68,12 +75,14 @@ class ResultadoEjercicio:
 @dataclass
 class Sesion:
     """Entidad que representa una sesión completa"""
-    person_id: int
+    person_id: int  # ACTUALIZADO: Ahora es requerido
     nivel: NivelTerapia
     fecha: datetime
     ejercicios_completados: List[ResultadoEjercicio]
     sesion_id: Optional[int] = None
+    numero_sesion: int = 1  # NUEVO: Número de sesión del usuario
     observaciones: str = ""
+    observaciones_terapeuta: str = ""  # NUEVO: Observaciones del terapeuta
     
     @property
     def total_ejercicios(self) -> int:
@@ -96,3 +105,13 @@ class Sesion:
     def fue_exitosa(self) -> bool:
         """Determina si la sesión fue exitosa"""
         return self.tasa_exito >= 0.70
+
+
+@dataclass
+class Observacion:
+    """Observación del terapeuta sobre un paciente"""
+    observacion_id: Optional[int]
+    person_id: int
+    fecha: datetime
+    observacion: str
+    terapeuta: Optional[str] = None
