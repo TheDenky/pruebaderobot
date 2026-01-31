@@ -81,6 +81,113 @@ class Database:
             self.conn.commit()
         except Exception as e:
             print(f"❌ Error al actualizar nivel: {e}")
+        
+    def actualizar_datos_persona(
+        self, 
+        person_id: int,
+        name: Optional[str] = None,
+        apellido: Optional[str] = None,
+        dni: Optional[str] = None,
+        age: Optional[int] = None,
+        sex: Optional[str] = None
+    ) -> bool:
+        """
+        Actualizar datos generales de una persona
+        Solo actualiza los campos que no sean None
+        
+        Returns:
+            True si se actualizó correctamente, False en caso contrario
+        """
+        try:
+            campos_actualizar = []
+            valores = []
+            
+            # Construir query dinámicamente solo con campos a actualizar
+            if name is not None:
+                campos_actualizar.append("name = ?")
+                valores.append(name)
+            
+            if apellido is not None:
+                campos_actualizar.append("apellido = ?")
+                valores.append(apellido)
+            
+            if dni is not None:
+                campos_actualizar.append("dni = ?")
+                valores.append(dni)
+            
+            if age is not None:
+                campos_actualizar.append("age = ?")
+                valores.append(age)
+            
+            if sex is not None:
+                campos_actualizar.append("sex = ?")
+                valores.append(sex)
+            
+            if not campos_actualizar:
+                print("⚠️ No hay campos para actualizar")
+                return False
+            
+            # Agregar person_id al final
+            valores.append(person_id)
+            
+            # Construir y ejecutar query
+            query = f"""
+                UPDATE person 
+                SET {', '.join(campos_actualizar)}
+                WHERE personId = ?
+            """
+            
+            cursor = self.conn.cursor()
+            cursor.execute(query, valores)
+            self.conn.commit()
+            
+            print(f"✅ Datos actualizados para persona ID {person_id}")
+            print(f"   Campos: {', '.join([c.split('=')[0].strip() for c in campos_actualizar])}")
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error al actualizar datos: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+    
+    def obtener_persona_completa(self, person_id: int) -> Optional[dict]:
+        """
+        Obtener todos los datos de una persona incluyendo apellido
+        
+        Returns:
+            Diccionario con todos los datos o None
+        """
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT p.*, l.name as nivel_nombre
+                FROM person p
+                LEFT JOIN level l ON p.actual_level = l.levelId
+                WHERE p.personId = ?
+            """, (person_id,))
+            
+            row = cursor.fetchone()
+            
+            if not row:
+                return None
+            
+            return {
+                'person_id': row['personId'],
+                'name': row['name'],
+                'apellido': row['apellido'] if 'apellido' in row.keys() else None,
+                'age': row['age'],
+                'dni': row['dni'] if 'dni' in row.keys() else None,
+                'sex': row['sex'] if 'sex' in row.keys() else None,
+                'nivel_id': row['actual_level'],
+                'nivel_nombre': row['nivel_nombre'],
+                'fecha_registro': row['register_date']
+            }
+            
+        except Exception as e:
+            print(f"❌ Error al obtener persona: {e}")
+            return None
     
     def contar_personas(self) -> int:
         """Contar total de personas"""

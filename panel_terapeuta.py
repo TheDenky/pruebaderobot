@@ -292,6 +292,27 @@ class PanelTerapeuta:
         )
         self.label_nombre.pack(side='left', padx=10)
         
+        # Apellido
+        frame_apellido = tk.Frame(frame, bg='white')
+        frame_apellido.pack(fill='x', padx=15, pady=8)
+        
+        tk.Label(
+            frame_apellido,
+            text="Apellido:",
+            font=('Arial', 11, 'bold'),
+            bg='white',
+            fg=self.color_primario
+        ).pack(side='left')
+        
+        self.label_apellido = tk.Label(
+            frame_apellido,
+            text="",
+            font=('Arial', 11),
+            bg='white',
+            fg='#333'
+        )
+        self.label_apellido.pack(side='left', padx=10)
+        
         # DNI
         frame_dni = tk.Frame(frame, bg='white')
         frame_dni.pack(fill='x', padx=15, pady=8)
@@ -371,6 +392,24 @@ class PanelTerapeuta:
             fg='#333'
         )
         self.label_fecha.pack(side='left', padx=10)
+        
+        # Botón de edición
+        frame_boton = tk.Frame(frame, bg='white')
+        frame_boton.pack(fill='x', padx=15, pady=15)
+        
+        btn_editar = tk.Button(
+            frame_boton,
+            text="✏️ Editar Información",
+            font=('Arial', 11, 'bold'),
+            bg=self.color_secundario,
+            fg='white',
+            relief='flat',
+            padx=20,
+            pady=10,
+            cursor='hand2',
+            command=self.abrir_ventana_edicion
+        )
+        btn_editar.pack()
     
     def _crear_seccion_nivel(self):
         """Crear sección de modificación de nivel"""
@@ -428,65 +467,23 @@ class PanelTerapeuta:
         )
         self.combo_nivel.pack(side='left', padx=10)
         
-        # Botones de acción
+        # Botón de acción
         frame_botones = tk.Frame(frame, bg='white')
         frame_botones.pack(fill='x', padx=15, pady=10)
         
         btn_aplicar = tk.Button(
             frame_botones,
-            text="✓ Aplicar Cambio",
-            font=('Arial', 11, 'bold'),
+            text="✓ Aplicar Cambio de Nivel",
+            font=('Arial', 12, 'bold'),
             bg=self.color_exito,
             fg='white',
             relief='flat',
-            padx=15,
-            pady=8,
+            padx=25,
+            pady=10,
             cursor='hand2',
             command=self.cambiar_nivel
         )
-        btn_aplicar.pack(side='left', padx=5)
-        
-        btn_subir = tk.Button(
-            frame_botones,
-            text="⬆️ Subir Nivel",
-            font=('Arial', 11),
-            bg=self.color_secundario,
-            fg='white',
-            relief='flat',
-            padx=15,
-            pady=8,
-            cursor='hand2',
-            command=self.subir_nivel
-        )
-        btn_subir.pack(side='left', padx=5)
-        
-        btn_bajar = tk.Button(
-            frame_botones,
-            text="⬇️ Bajar Nivel",
-            font=('Arial', 11),
-            bg=self.color_advertencia,
-            fg='white',
-            relief='flat',
-            padx=15,
-            pady=8,
-            cursor='hand2',
-            command=self.bajar_nivel
-        )
-        btn_bajar.pack(side='left', padx=5)
-        
-        btn_reiniciar = tk.Button(
-            frame_botones,
-            text="🔄 Reiniciar a INICIAL",
-            font=('Arial', 11),
-            bg=self.color_error,
-            fg='white',
-            relief='flat',
-            padx=15,
-            pady=8,
-            cursor='hand2',
-            command=self.reiniciar_nivel
-        )
-        btn_reiniciar.pack(side='left', padx=5)
+        btn_aplicar.pack(pady=5)
         
         # Observaciones
         frame_obs = tk.Frame(frame, bg='white')
@@ -610,6 +607,7 @@ class PanelTerapeuta:
                 SELECT 
                     p.personId,
                     p.name,
+                    p.apellido,
                     p.age,
                     p.sex,
                     p.dni,
@@ -627,12 +625,17 @@ class PanelTerapeuta:
             for persona in personas:
                 sexo_icono = "👦" if persona['sex'] == 'M' else "👧" if persona['sex'] == 'F' else "👤"
                 
+                # Construir nombre completo
+                nombre_completo = persona['name']
+                if persona['apellido']:
+                    nombre_completo += f" {persona['apellido']}"
+                
                 self.tree_usuarios.insert(
                     '',
                     'end',
                     values=(
                         persona['personId'],
-                        f"{sexo_icono} {persona['name']}",
+                        f"{sexo_icono} {nombre_completo}",
                         f"{persona['age']} años",
                         persona['nivel'] or 'N/A',
                         persona['num_sesiones']
@@ -695,6 +698,10 @@ class PanelTerapeuta:
             
             # Actualizar información básica
             self.label_nombre.config(text=persona_row['name'])
+            
+            # Apellido
+            apellido_text = persona_row['apellido'] if 'apellido' in persona_row.keys() and persona_row['apellido'] else "No registrado"
+            self.label_apellido.config(text=apellido_text)
             
             dni_text = persona_row['dni'] if persona_row['dni'] else "No registrado"
             self.label_dni.config(text=dni_text)
@@ -1136,6 +1143,295 @@ class PanelTerapeuta:
         except Exception as e:
             print(f"❌ Error al guardar observaciones: {e}")
             messagebox.showerror("Error", f"No se pudieron guardar las observaciones:\n{e}")
+    
+    def abrir_ventana_edicion(self):
+        """Abrir ventana modal para editar información del paciente"""
+        
+        if not self.persona_seleccionada:
+            messagebox.showwarning("Advertencia", "No hay paciente seleccionado")
+            return
+        
+        # Crear ventana modal
+        ventana_modal = tk.Toplevel(self.ventana)
+        ventana_modal.title(f"Editar Información - {self.persona_seleccionada['name']}")
+        ventana_modal.geometry("600x550")
+        ventana_modal.configure(bg='white')
+        
+        # Centrar en pantalla
+        ventana_modal.update_idletasks()
+        width = ventana_modal.winfo_width()
+        height = ventana_modal.winfo_height()
+        x = (ventana_modal.winfo_screenwidth() // 2) - (width // 2)
+        y = (ventana_modal.winfo_screenheight() // 2) - (height // 2)
+        ventana_modal.geometry(f'{width}x{height}+{x}+{y}')
+        
+        # Hacer modal
+        ventana_modal.transient(self.ventana)
+        ventana_modal.grab_set()
+        ventana_modal.focus_set()
+        
+        # Header
+        frame_header = tk.Frame(ventana_modal, bg=self.color_primario, height=80)
+        frame_header.pack(fill='x')
+        frame_header.pack_propagate(False)
+        
+        tk.Label(
+            frame_header,
+            text="✏️ Editar Información del Paciente",
+            font=('Arial', 18, 'bold'),
+            bg=self.color_primario,
+            fg='white'
+        ).pack(pady=25)
+        
+        # Frame de contenido
+        frame_contenido = tk.Frame(ventana_modal, bg='white')
+        frame_contenido.pack(fill='both', expand=True, padx=30, pady=20)
+        
+        # Variables para los campos
+        var_nombre = tk.StringVar(value=self.persona_seleccionada['name'])
+        var_apellido = tk.StringVar(value=self.persona_seleccionada.get('apellido', '') or '')
+        var_dni = tk.StringVar(value=self.persona_seleccionada.get('dni', '') or '')
+        var_edad = tk.IntVar(value=self.persona_seleccionada['age'])
+        var_sexo = tk.StringVar()
+        
+        # Configurar sexo
+        sexo_actual = self.persona_seleccionada.get('sex', '')
+        if sexo_actual == 'M':
+            var_sexo.set('Masculino')
+        elif sexo_actual == 'F':
+            var_sexo.set('Femenino')
+        else:
+            var_sexo.set('No especificado')
+        
+        # Campo: Nombre
+        tk.Label(
+            frame_contenido,
+            text="Nombre:",
+            font=('Arial', 11, 'bold'),
+            bg='white',
+            fg=self.color_primario
+        ).grid(row=0, column=0, sticky='w', pady=10)
+        
+        entry_nombre = tk.Entry(
+            frame_contenido,
+            textvariable=var_nombre,
+            font=('Arial', 11),
+            width=35,
+            relief='solid',
+            bd=1
+        )
+        entry_nombre.grid(row=0, column=1, pady=10, sticky='ew')
+        
+        # Campo: Apellido
+        tk.Label(
+            frame_contenido,
+            text="Apellido:",
+            font=('Arial', 11, 'bold'),
+            bg='white',
+            fg=self.color_primario
+        ).grid(row=1, column=0, sticky='w', pady=10)
+        
+        entry_apellido = tk.Entry(
+            frame_contenido,
+            textvariable=var_apellido,
+            font=('Arial', 11),
+            width=35,
+            relief='solid',
+            bd=1
+        )
+        entry_apellido.grid(row=1, column=1, pady=10, sticky='ew')
+        
+        # Campo: DNI
+        tk.Label(
+            frame_contenido,
+            text="DNI:",
+            font=('Arial', 11, 'bold'),
+            bg='white',
+            fg=self.color_primario
+        ).grid(row=2, column=0, sticky='w', pady=10)
+        
+        entry_dni = tk.Entry(
+            frame_contenido,
+            textvariable=var_dni,
+            font=('Arial', 11),
+            width=35,
+            relief='solid',
+            bd=1
+        )
+        entry_dni.grid(row=2, column=1, pady=10, sticky='ew')
+        
+        # Ayuda para DNI
+        tk.Label(
+            frame_contenido,
+            text="(8-11 dígitos, opcional)",
+            font=('Arial', 9),
+            bg='white',
+            fg='#666'
+        ).grid(row=3, column=1, sticky='w')
+        
+        # Campo: Edad
+        tk.Label(
+            frame_contenido,
+            text="Edad:",
+            font=('Arial', 11, 'bold'),
+            bg='white',
+            fg=self.color_primario
+        ).grid(row=4, column=0, sticky='w', pady=10)
+        
+        spinbox_edad = tk.Spinbox(
+            frame_contenido,
+            from_=1,
+            to=100,
+            textvariable=var_edad,
+            font=('Arial', 11),
+            width=10,
+            relief='solid',
+            bd=1
+        )
+        spinbox_edad.grid(row=4, column=1, pady=10, sticky='w')
+        
+        # Campo: Sexo
+        tk.Label(
+            frame_contenido,
+            text="Sexo:",
+            font=('Arial', 11, 'bold'),
+            bg='white',
+            fg=self.color_primario
+        ).grid(row=5, column=0, sticky='w', pady=10)
+        
+        combo_sexo = ttk.Combobox(
+            frame_contenido,
+            textvariable=var_sexo,
+            values=['Masculino', 'Femenino', 'No especificado'],
+            state='readonly',
+            font=('Arial', 11),
+            width=20
+        )
+        combo_sexo.grid(row=5, column=1, pady=10, sticky='w')
+        
+        # Configurar expansión de columna
+        frame_contenido.columnconfigure(1, weight=1)
+        
+        # Frame de botones
+        frame_botones = tk.Frame(ventana_modal, bg='white')
+        frame_botones.pack(fill='x', padx=30, pady=20)
+        
+        # Función de guardado
+        def guardar_cambios():
+            # Obtener valores
+            nombre = var_nombre.get().strip()
+            apellido = var_apellido.get().strip()
+            dni = var_dni.get().strip()
+            edad = var_edad.get()
+            sexo_texto = var_sexo.get()
+            
+            # Convertir sexo
+            if sexo_texto == 'Masculino':
+                sexo = 'M'
+            elif sexo_texto == 'Femenino':
+                sexo = 'F'
+            else:
+                sexo = None
+            
+            # Validar
+            es_valido, mensaje_error = self.validar_datos_edicion(
+                nombre, apellido, dni, edad, sexo
+            )
+            
+            if not es_valido:
+                messagebox.showerror("Error de Validación", mensaje_error)
+                return
+            
+            # Actualizar en BD
+            exito = self.db.actualizar_datos_persona(
+                person_id=self.persona_seleccionada['person_id'],
+                name=nombre,
+                apellido=apellido if apellido else None,
+                dni=dni if dni else None,
+                age=edad,
+                sex=sexo
+            )
+            
+            if exito:
+                messagebox.showinfo("Éxito", "Información actualizada correctamente")
+                
+                # Actualizar persona seleccionada
+                self.persona_seleccionada['name'] = nombre
+                self.persona_seleccionada['apellido'] = apellido
+                self.persona_seleccionada['dni'] = dni
+                self.persona_seleccionada['age'] = edad
+                self.persona_seleccionada['sex'] = sexo
+                
+                # Cerrar modal
+                ventana_modal.destroy()
+                
+                # Recargar interfaz
+                self.cargar_detalles_usuario(self.persona_seleccionada['person_id'])
+                self.cargar_usuarios()
+                
+            else:
+                messagebox.showerror("Error", "No se pudo actualizar la información")
+        
+        # Botón Guardar
+        btn_guardar = tk.Button(
+            frame_botones,
+            text="✅ Guardar Cambios",
+            font=('Arial', 12, 'bold'),
+            bg=self.color_exito,
+            fg='white',
+            relief='flat',
+            padx=30,
+            pady=12,
+            cursor='hand2',
+            command=guardar_cambios
+        )
+        btn_guardar.pack(side='left', padx=10)
+        
+        # Botón Cancelar
+        btn_cancelar = tk.Button(
+            frame_botones,
+            text="❌ Cancelar",
+            font=('Arial', 12),
+            bg='#95a5a6',
+            fg='white',
+            relief='flat',
+            padx=30,
+            pady=12,
+            cursor='hand2',
+            command=ventana_modal.destroy
+        )
+        btn_cancelar.pack(side='left', padx=10)
+    
+    def validar_datos_edicion(self, nombre, apellido, dni, edad, sexo):
+        """
+        Validar datos antes de guardar
+        
+        Returns:
+            (es_valido, mensaje_error)
+        """
+        # Validar nombre
+        if not nombre or len(nombre) < 2:
+            return False, "El nombre debe tener al menos 2 caracteres"
+        
+        # Validar DNI (opcional pero si se proporciona debe ser válido)
+        if dni:
+            # Solo dígitos
+            if not dni.isdigit():
+                return False, "El DNI debe contener solo números"
+            
+            # Longitud 8-11
+            if len(dni) < 8 or len(dni) > 11:
+                return False, "El DNI debe tener entre 8 y 11 dígitos"
+        
+        # Validar edad
+        if edad < 1 or edad > 100:
+            return False, "La edad debe estar entre 1 y 100 años"
+        
+        # Validar sexo
+        if sexo and sexo not in ['M', 'F']:
+            return False, "Sexo inválido"
+        
+        return True, ""
     
     def cerrar(self):
         """Cerrar el panel"""

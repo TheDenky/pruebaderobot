@@ -23,8 +23,9 @@ class Persona:
     name: str
     age: int
     person_id: Optional[int] = None
-    dni: Optional[str] = None  # NUEVO
-    sex: Optional[str] = None  # NUEVO: 'M' o 'F'
+    apellido: Optional[str] = None
+    dni: Optional[str] = None  
+    sex: Optional[str] = None  # 'M' o 'F'
     nivel_actual: NivelTerapia = NivelTerapia.INICIAL
     fecha_registro: datetime = field(default_factory=datetime.now)
     

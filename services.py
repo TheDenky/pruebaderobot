@@ -217,7 +217,7 @@ class RobotServiceInterfazUnificada:
 #                 print("⚠️ No se pudo extraer DNI")
 #         else:
 #             print("⚠️ DNI no proporcionado")
-        
+        dni = None
         # === CONFIRMACIÓN ===
         sexo_texto = "niño" if sexo == 'M' else "niña" if sexo == 'F' else "persona"
         dni_texto_confirmacion = f", DNI {dni}" if dni else ""
