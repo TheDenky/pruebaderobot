@@ -354,24 +354,25 @@ class Database:
     def obtener_ultima_sesion(self, person_id: int) -> Optional[Sesion]:
         """Obtener última sesión de una persona"""
         try:
-            # Obtener persona para saber su nivel actual
             cursor = self.conn.cursor()
-            cursor.execute('SELECT * FROM person WHERE personId = ?', (person_id,))
-            persona_row = cursor.fetchone()
             
-            if not persona_row:
-                return None
-            
-            nivel_actual = persona_row['actual_level']
-            
-            # Obtener última sesión de ese nivel
+            # Obtener última sesión de esta persona específica
             cursor.execute('''
                 SELECT * FROM sesion 
-                WHERE levelId = ?
+                WHERE personId = ?
                 ORDER BY date DESC 
                 LIMIT 1
-            ''', (nivel_actual,))
+            ''', (person_id,))
+            
             row = cursor.fetchone()
+            
+            if row:
+                return self._row_to_sesion(row, person_id)
+            return None
+            
+        except Exception as e:
+            print(f"❌ Error al obtener sesión: {e}")
+            return None
             
             if row:
                 return self._row_to_sesion(row, person_id)
@@ -484,15 +485,22 @@ class Database:
         # Obtener personId de la sesión o usar el proporcionado
         session_person_id = row['personId'] if 'personId' in row.keys() and row['personId'] else person_id
         
+        # Obtener valores de ejercicios desde BD
+        correctos = row['correct_exercise'] if 'correct_exercise' in row.keys() and row['correct_exercise'] else 0
+        fallidos = row['failed_exercise'] if 'failed_exercise' in row.keys() and row['failed_exercise'] else 0
+        
         return Sesion(
             sesion_id=row['sesionId'],
             person_id=session_person_id,
             nivel=nivel,
             fecha=fecha,
             numero_sesion=row['number'] if row['number'] else 1,
-            ejercicios_completados=[],
+            ejercicios_completados=[],  # Vacío al cargar de BD (no necesario)
             observaciones=row['observation'] if row['observation'] else '',
-            observaciones_terapeuta=row['observaciones_terapeuta'] if 'observaciones_terapeuta' in row.keys() else ''
+            observaciones_terapeuta=row['observaciones_terapeuta'] if 'observaciones_terapeuta' in row.keys() else '',
+            # NUEVO: Pasar valores de BD para que las propiedades los usen
+            _ejercicios_correctos_bd=correctos,
+            _ejercicios_fallidos_bd=fallidos
         )
     
     # ========== UTILIDADES ==========

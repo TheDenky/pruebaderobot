@@ -812,7 +812,7 @@ class PanelTerapeuta:
             tasas = [s.tasa_exito * 100 for s in sesiones[-10:]]
             
             # Crear figura
-            fig = Figure(figsize=(8, 4), dpi=80)
+            fig = Figure(figsize=(4, 4), dpi=80)
             ax = fig.add_subplot(111)
             
             # Gráfico de línea
@@ -889,15 +889,23 @@ class PanelTerapeuta:
     def _cargar_observaciones(self, person_id: int):
         """Cargar observaciones del terapeuta"""
         try:
+            # SIEMPRE limpiar el campo primero
+            self.text_observaciones.delete("1.0", "end")
+            
+            # Obtener observaciones
             observaciones = self.db.obtener_observaciones_persona(person_id)
             
+            # Si hay observaciones, cargar la más reciente
             if observaciones:
                 obs_reciente = observaciones[0]
-                self.text_observaciones.delete("1.0", "end")
                 self.text_observaciones.insert("1.0", obs_reciente['observacion'])
+            # Si NO hay observaciones, el campo quedará vacío (correcto)
+            
         except Exception as e:
             print(f"⚠️ Error al cargar observaciones: {e}")
-    
+            # En caso de error, también limpiar
+            self.text_observaciones.delete("1.0", "end")
+            
     # ===== FUNCIONES DE MODIFICACIÓN =====
     
     def cambiar_nivel(self):

@@ -76,32 +76,52 @@ class ResultadoEjercicio:
 @dataclass
 class Sesion:
     """Entidad que representa una sesión completa"""
-    person_id: int  # ACTUALIZADO: Ahora es requerido
+    person_id: int
     nivel: NivelTerapia
     fecha: datetime
     ejercicios_completados: List[ResultadoEjercicio]
     sesion_id: Optional[int] = None
-    numero_sesion: int = 1  # NUEVO: Número de sesión del usuario
+    numero_sesion: int = 1
     observaciones: str = ""
-    observaciones_terapeuta: str = ""  # NUEVO: Observaciones del terapeuta
+    observaciones_terapeuta: str = ""
+    # NUEVO: Valores precalculados desde BD (para historial)
+    _ejercicios_correctos_bd: Optional[int] = None
+    _ejercicios_fallidos_bd: Optional[int] = None
     
     @property
     def total_ejercicios(self) -> int:
+        """Total de ejercicios en la sesión"""
+        # Si tenemos datos de BD, usarlos
+        if self._ejercicios_correctos_bd is not None and self._ejercicios_fallidos_bd is not None:
+            return self._ejercicios_correctos_bd + self._ejercicios_fallidos_bd
+        # Si no, calcular de la lista
         return len(self.ejercicios_completados)
     
     @property
     def ejercicios_correctos(self) -> int:
+        """Ejercicios correctos en la sesión"""
+        # Si tenemos dato de BD, usarlo (más eficiente)
+        if self._ejercicios_correctos_bd is not None:
+            return self._ejercicios_correctos_bd
+        # Si no, calcular de la lista
         return sum(1 for e in self.ejercicios_completados if e.correcto)
     
     @property
     def ejercicios_fallidos(self) -> int:
+        """Ejercicios fallidos en la sesión"""
+        # Si tenemos dato de BD, usarlo
+        if self._ejercicios_fallidos_bd is not None:
+            return self._ejercicios_fallidos_bd
+        # Si no, calcular
         return self.total_ejercicios - self.ejercicios_correctos
     
     @property
     def tasa_exito(self) -> float:
-        if self.total_ejercicios == 0:
+        """Tasa de éxito (0.0 - 1.0)"""
+        total = self.total_ejercicios
+        if total == 0:
             return 0.0
-        return self.ejercicios_correctos / self.total_ejercicios
+        return self.ejercicios_correctos / total
     
     def fue_exitosa(self) -> bool:
         """Determina si la sesión fue exitosa"""
