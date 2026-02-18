@@ -17,7 +17,7 @@ class AsistenteInteligente:
     
     def __init__(self):
         try:
-            self.client = OpenAI()
+            self.client = OpenAI(timeout=10.0)
             print("✅ Asistente IA inicializado")
         except Exception as e:
             print("❌ Error inicializando OpenAI:", e)

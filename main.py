@@ -109,7 +109,10 @@ class RobotDodoUnificado:
                     hora = datetime.now().strftime('%H:%M:%S')
                     print(f"[{hora}] 👂 Escuchando... (di '{Config.ACTIVATION_WORD}' o 'adiós')")
                     
-                    texto = self.audio.escuchar(timeout=Config.AUDIO_TIMEOUT)
+                    texto = self.audio.escuchar(
+                        timeout=Config.AUDIO_TIMEOUT,
+                        phrase_time_limit=Config.AUDIO_PHRASE_LIMIT
+                    )
 
                     # Verificar inactividad
                     tiempo_inactivo = time_module.time() - ultima_actividad

@@ -14,7 +14,7 @@ class Config:
     # === AUDIO ===
     AUDIO_FOLDER = "audio_registros"
     AUDIO_TIMEOUT = 10
-    AUDIO_PHRASE_LIMIT = 10
+    AUDIO_PHRASE_LIMIT = 5
     ENERGY_THRESHOLD = 300
     RECORDING_DURATION = 5  # segundos
     

@@ -1,7 +1,8 @@
 """
-PANEL DE TERAPEUTA - Interfaz de administración
-Permite visualizar progreso y modificar niveles de usuarios
-VERSIÓN COMPLETA CON TODOS LOS MÉTODOS
+PANEL DE TERAPEUTA MODERNO
+Interfaz de administración con diseño moderno usando pestañas
+Optimizado para resolución 1024x600
+Diseño profesional, amigable y con colores modernos
 """
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
@@ -16,7 +17,7 @@ from models import NivelTerapia, Persona
 
 
 class PanelTerapeuta:
-    """Panel de administración para el terapeuta"""
+    """Panel de administración moderno con diseño de pestañas"""
     
     def __init__(self, db: Database, audio_system=None):
         self.db = db
@@ -25,41 +26,63 @@ class PanelTerapeuta:
         self.persona_seleccionada = None
         self.modo_admin_activo = True
         
-        # Colores profesionales
-        self.color_fondo = '#F5F5F5'
-        self.color_primario = '#2C3E50'
-        self.color_secundario = '#3498DB'
-        self.color_exito = '#2ECC71'
-        self.color_advertencia = '#F39C12'
-        self.color_error = '#E74C3C'
+        # 🎨 PALETA DE COLORES MODERNA Y PROFESIONAL
+        self.colores = {
+            # Colores principales
+            'primary': '#4A90E2',      # Azul profesional
+            'primary_dark': '#357ABD', # Azul oscuro
+            'secondary': '#7B68EE',    # Púrpura moderno
+            'accent': '#50C878',       # Verde esmeralda
+            
+            # Fondos
+            'bg_main': '#F8F9FA',      # Gris muy claro
+            'bg_card': '#FFFFFF',      # Blanco puro
+            'bg_header': '#2C3E50',    # Azul oscuro elegante
+            
+            # Estados
+            'success': '#10B981',      # Verde éxito
+            'warning': '#F59E0B',      # Naranja advertencia
+            'error': '#EF4444',        # Rojo error
+            'info': '#3B82F6',         # Azul info
+            
+            # Tabs
+            'tab_info': '#4A90E2',     # Azul
+            'tab_terapia': '#7B68EE',  # Púrpura
+            'tab_progreso': '#10B981', # Verde
+            'tab_historial': '#F59E0B',# Naranja
+            
+            # Texto
+            'text_dark': '#1F2937',    # Gris oscuro
+            'text_medium': '#6B7280',  # Gris medio
+            'text_light': '#9CA3AF',   # Gris claro
+            'text_white': '#FFFFFF',   # Blanco
+            
+            # Bordes
+            'border_light': '#E5E7EB', # Borde claro
+            'border_medium': '#D1D5DB',# Borde medio
+        }
         
         # Widgets principales
         self.tree_usuarios = None
-        self.frame_detalles = None
-        self.label_nombre = None
-        self.label_dni = None
-        self.label_edad = None
-        self.label_sexo = None
-        self.label_fecha = None
-        self.label_nivel = None
-        self.combo_nivel = None
-        self.text_observaciones = None
-        self.canvas_grafico = None
-        self.tree_historial = None
-        self.frame_stats = None
-        self.frame_grafico = None
+        self.notebook = None  # Pestañas principales
+        
+        # Widgets por pestaña
+        self.tabs = {}
+        self.widgets = {}
     
     def crear(self):
-        """Crear ventana del panel"""
+        """Crear ventana del panel moderno"""
         self.ventana = tk.Toplevel()
         self.ventana.title("Panel de Terapeuta - Robot DODO")
-        self.ventana.geometry("1400x900")
-        self.ventana.configure(bg=self.color_fondo)
+        
+        # 📐 OPTIMIZADO PARA 1024x600
+        self.ventana.geometry("1024x600")
+        self.ventana.configure(bg=self.colores['bg_main'])
         
         # Centrar en pantalla
         self.ventana.update_idletasks()
-        width = self.ventana.winfo_width()
-        height = self.ventana.winfo_height()
+        width = 1024
+        height = 600
         x = (self.ventana.winfo_screenwidth() // 2) - (width // 2)
         y = (self.ventana.winfo_screenheight() // 2) - (height // 2)
         self.ventana.geometry(f'{width}x{height}+{x}+{y}')
@@ -75,530 +98,634 @@ class PanelTerapeuta:
                 daemon=True
             )
             self.hilo_escucha_admin.start()
-            print("🎤 Escucha por voz activada en panel de administrador")
-            print("   Di 'salir' o 'cerrar' para salir del panel")
         
-        # Header
-        self._crear_header()
-        
-        # Contenedor principal
-        frame_principal = tk.Frame(self.ventana, bg=self.color_fondo)
-        frame_principal.pack(fill='both', expand=True, padx=20, pady=10)
-        
-        # Panel izquierdo: Lista de usuarios
-        self._crear_panel_usuarios(frame_principal)
-        
-        # Panel derecho: Detalles y edición
-        self._crear_panel_detalles(frame_principal)
+        # 🎨 Crear interfaz
+        self._crear_header_moderno()
+        self._crear_layout_principal()
         
         # Cargar datos iniciales
         self.cargar_usuarios()
     
     def _escuchar_comandos_voz(self):
         """Escuchar comandos de voz para salir del panel"""
-        from chatopenai import detectar_salir_panel
         import time
+        
+        # ✅ Import FUERA del loop para detectar errores
+        try:
+            from chatopenai import detectar_salir_panel
+        except Exception as e:
+            print(f"❌ [Panel Admin] Error importando detectar_salir_panel: {e}")
+            return
+        
+        print("🎤 [Panel Admin] Escucha de voz iniciada")
+        print("   Di 'salir' o 'cerrar' para salir del panel")
         
         while self.modo_admin_activo:
             try:
-                texto = self.audio.escuchar(timeout=5, phrase_time_limit=5)
+                print("🎤 [Panel Admin] Escuchando...")
+                
+                texto = self.audio.escuchar(timeout=2, phrase_time_limit=5)
+                
+                if not self.modo_admin_activo:
+                    break
                 
                 if texto:
                     print(f"🎤 [Panel Admin] Escuché: '{texto}'")
                     
                     if detectar_salir_panel(texto):
-                        print("🚪 Detectada intención de salir del panel")
+                        print("🚪 [Panel Admin] Detectado comando de salida")
                         self.audio.hablar("Cerrando panel de administrador.")
                         self.ventana.after(100, self.cerrar)
                         break
-                
-                time.sleep(0.5)
-                
+                else:
+                    print("🎤 [Panel Admin] Silencio o timeout")
+            
             except Exception as e:
-                print(f"⚠️ Error en escucha de panel admin: {e}")
+                # ✅ Ahora SÍ muestra el error en lugar de ocultarlo
+                print(f"⚠️ [Panel Admin] Error en escucha: {e}")
                 time.sleep(1)
+            
+            time.sleep(0.3)
+        
+        print("🔇 [Panel Admin] Escucha finalizada")
     
-    def _crear_header(self):
-        """Crear header del panel"""
-        frame_header = tk.Frame(self.ventana, bg=self.color_primario, height=80)
+    def _crear_header_moderno(self):
+        """Crear header moderno y compacto"""
+        frame_header = tk.Frame(
+            self.ventana, 
+            bg=self.colores['bg_header'], 
+            height=60
+        )
         frame_header.pack(fill='x')
         frame_header.pack_propagate(False)
         
-        # Título
-        label_titulo = tk.Label(
-            frame_header,
-            text="🩺 Panel de Terapeuta",
-            font=('Arial', 28, 'bold'),
-            bg=self.color_primario,
-            fg='white'
-        )
-        label_titulo.pack(side='left', padx=30, pady=20)
+        # Contenedor interno para centrar
+        container = tk.Frame(frame_header, bg=self.colores['bg_header'])
+        container.pack(fill='both', expand=True, padx=20)
         
-        # Información del sistema
+        # Título con icono
+        label_titulo = tk.Label(
+            container,
+            text="🩺 Panel de Terapeuta",
+            font=('Segoe UI', 18, 'bold'),
+            bg=self.colores['bg_header'],
+            fg=self.colores['text_white']
+        )
+        label_titulo.pack(side='left', pady=15)
+        
+        # Información compacta del sistema
         info_db = self.db.verificar_integridad()
-        texto_info = f"👥 {info_db.get('personas', 0)} pacientes  |  📊 {info_db.get('sesiones', 0)} sesiones  |  📝 {info_db.get('ejercicios', 0)} ejercicios"
+        texto_info = f"👥 {info_db.get('personas', 0)} Pacientes  •  📊 {info_db.get('sesiones', 0)} Sesiones"
         
         label_info = tk.Label(
-            frame_header,
+            container,
             text=texto_info,
-            font=('Arial', 12),
-            bg=self.color_primario,
-            fg='white'
+            font=('Segoe UI', 10),
+            bg=self.colores['bg_header'],
+            fg=self.colores['text_light']
         )
-        label_info.pack(side='right', padx=30)
+        label_info.pack(side='right', pady=15)
     
-    def _crear_panel_usuarios(self, parent):
-        """Crear panel de lista de usuarios"""
-        frame_izquierdo = tk.Frame(parent, bg=self.color_fondo)
-        frame_izquierdo.pack(side='left', fill='both', expand=False, padx=(0, 10))
-        frame_izquierdo.configure(width=500)
+    def _crear_layout_principal(self):
+        """Crear layout principal con lista y pestañas"""
+        # Frame principal
+        frame_main = tk.Frame(self.ventana, bg=self.colores['bg_main'])
+        frame_main.pack(fill='both', expand=True, padx=10, pady=10)
+        
+        # 📋 PANEL IZQUIERDO: Lista de pacientes (30% del ancho)
+        self._crear_panel_lista(frame_main)
+        
+        # 📑 PANEL DERECHO: Pestañas con detalles (70% del ancho)
+        self._crear_panel_pestanas(frame_main)
+    
+    def _crear_panel_lista(self, parent):
+        """Crear panel de lista de pacientes"""
+        frame_lista = tk.Frame(parent, bg=self.colores['bg_main'])
+        frame_lista.pack(side='left', fill='both', padx=(0, 10))
+        frame_lista.configure(width=300)
+        
+        # Card contenedor
+        card = tk.Frame(
+            frame_lista,
+            bg=self.colores['bg_card'],
+            relief='flat',
+            bd=0
+        )
+        card.pack(fill='both', expand=True)
+        
+        # Agregar borde sutil
+        card.configure(highlightbackground=self.colores['border_light'], highlightthickness=1)
         
         # Título
-        label_titulo = tk.Label(
-            frame_izquierdo,
-            text="📋 Lista de Pacientes",
-            font=('Arial', 16, 'bold'),
-            bg=self.color_fondo,
-            fg=self.color_primario
-        )
-        label_titulo.pack(pady=(0, 10))
+        frame_titulo = tk.Frame(card, bg=self.colores['bg_card'])
+        frame_titulo.pack(fill='x', padx=15, pady=(15, 10))
         
-        # Frame para el Treeview
-        frame_tree = tk.Frame(frame_izquierdo, bg='white', relief='ridge', bd=2)
-        frame_tree.pack(fill='both', expand=True)
+        tk.Label(
+            frame_titulo,
+            text="📋 Pacientes",
+            font=('Segoe UI', 13, 'bold'),
+            bg=self.colores['bg_card'],
+            fg=self.colores['text_dark']
+        ).pack(side='left')
+        
+        # Botón actualizar
+        btn_refresh = tk.Button(
+            frame_titulo,
+            text="🔄",
+            font=('Segoe UI', 11),
+            bg=self.colores['bg_card'],
+            fg=self.colores['primary'],
+            relief='flat',
+            bd=0,
+            cursor='hand2',
+            command=self.cargar_usuarios
+        )
+        btn_refresh.pack(side='right')
+        
+        # Frame para Treeview
+        frame_tree = tk.Frame(card, bg=self.colores['bg_card'])
+        frame_tree.pack(fill='both', expand=True, padx=15, pady=(0, 15))
         
         # Scrollbar
         scrollbar = ttk.Scrollbar(frame_tree)
         scrollbar.pack(side='right', fill='y')
         
-        # Treeview
-        columnas = ('ID', 'Nombre', 'Edad', 'Nivel', 'Sesiones')
+        # Treeview con estilo moderno
+        style = ttk.Style()
+        style.theme_use('clam')
+        style.configure(
+            "Treeview",
+            background=self.colores['bg_card'],
+            foreground=self.colores['text_dark'],
+            fieldbackground=self.colores['bg_card'],
+            borderwidth=0,
+            font=('Segoe UI', 9)
+        )
+        style.configure("Treeview.Heading", font=('Segoe UI', 9, 'bold'))
+        style.map('Treeview', background=[('selected', self.colores['primary'])])
+        
+        columnas = ('Nombre', 'Nivel')
         self.tree_usuarios = ttk.Treeview(
             frame_tree,
             columns=columnas,
             show='headings',
             yscrollcommand=scrollbar.set,
-            selectmode='browse'
+            selectmode='browse',
+            height=16
         )
         
-        # Configurar columnas
-        self.tree_usuarios.heading('ID', text='ID')
         self.tree_usuarios.heading('Nombre', text='Nombre')
-        self.tree_usuarios.heading('Edad', text='Edad')
-        self.tree_usuarios.heading('Nivel', text='Nivel Actual')
-        self.tree_usuarios.heading('Sesiones', text='Sesiones')
+        self.tree_usuarios.heading('Nivel', text='Nivel')
         
-        self.tree_usuarios.column('ID', width=50, anchor='center')
         self.tree_usuarios.column('Nombre', width=180)
-        self.tree_usuarios.column('Edad', width=60, anchor='center')
-        self.tree_usuarios.column('Nivel', width=120)
-        self.tree_usuarios.column('Sesiones', width=80, anchor='center')
+        self.tree_usuarios.column('Nivel', width=80)
         
         self.tree_usuarios.pack(fill='both', expand=True)
         scrollbar.config(command=self.tree_usuarios.yview)
         
         # Evento de selección
         self.tree_usuarios.bind('<<TreeviewSelect>>', self.on_seleccionar_usuario)
-        
-        # Botones de acción
-        frame_botones = tk.Frame(frame_izquierdo, bg=self.color_fondo)
-        frame_botones.pack(pady=10)
-        
-        btn_actualizar = tk.Button(
-            frame_botones,
-            text="🔄 Actualizar",
-            font=('Arial', 11),
-            bg=self.color_secundario,
-            fg='white',
-            relief='flat',
-            padx=20,
-            pady=8,
-            cursor='hand2',
-            command=self.cargar_usuarios
-        )
-        btn_actualizar.pack(side='left', padx=5)
     
-    def _crear_panel_detalles(self, parent):
-        """Crear panel de detalles del usuario"""
-        frame_derecho = tk.Frame(parent, bg=self.color_fondo)
-        frame_derecho.pack(side='right', fill='both', expand=True)
+    def _crear_panel_pestanas(self, parent):
+        """Crear panel de pestañas moderno"""
+        frame_pestanas = tk.Frame(parent, bg=self.colores['bg_main'])
+        frame_pestanas.pack(side='right', fill='both', expand=True)
         
-        # Título
-        label_titulo = tk.Label(
-            frame_derecho,
-            text="📊 Detalles del Paciente",
-            font=('Arial', 16, 'bold'),
-            bg=self.color_fondo,
-            fg=self.color_primario
+        # Configurar estilo de pestañas
+        style = ttk.Style()
+        style.configure(
+            'Modern.TNotebook',
+            background=self.colores['bg_main'],
+            borderwidth=0
         )
-        label_titulo.pack(pady=(0, 10))
-        
-        # Frame contenedor con scroll
-        canvas = tk.Canvas(frame_derecho, bg=self.color_fondo, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(frame_derecho, orient='vertical', command=canvas.yview)
-        self.frame_detalles = tk.Frame(canvas, bg=self.color_fondo)
-        
-        self.frame_detalles.bind(
-            '<Configure>',
-            lambda e: canvas.configure(scrollregion=canvas.bbox('all'))
+        style.configure(
+            'Modern.TNotebook.Tab',
+            padding=[20, 10],
+            font=('Segoe UI', 10, 'bold'),
+            background=self.colores['bg_card'],
+            foreground=self.colores['text_medium']
+        )
+        style.map(
+            'Modern.TNotebook.Tab',
+            background=[('selected', self.colores['bg_card'])],
+            foreground=[('selected', self.colores['primary'])],
+            expand=[('selected', [1, 1, 1, 0])]
         )
         
-        canvas.create_window((0, 0), window=self.frame_detalles, anchor='nw')
-        canvas.configure(yscrollcommand=scrollbar.set)
+        # Crear Notebook
+        self.notebook = ttk.Notebook(frame_pestanas, style='Modern.TNotebook')
+        self.notebook.pack(fill='both', expand=True)
         
-        canvas.pack(side='left', fill='both', expand=True)
-        scrollbar.pack(side='right', fill='y')
-        
-        # Secciones del panel de detalles
-        self._crear_seccion_informacion()
-        self._crear_seccion_nivel()
-        self._crear_seccion_progreso()
-        self._crear_seccion_historial()
+        # 🎨 Crear 4 pestañas
+        self._crear_tab_informacion()
+        self._crear_tab_terapia()
+        self._crear_tab_progreso()
+        self._crear_tab_historial()
         
         # Mostrar mensaje inicial
         self._mostrar_mensaje_inicial()
     
-    def _crear_seccion_informacion(self):
-        """Crear sección de información básica"""
-        frame = tk.LabelFrame(
-            self.frame_detalles,
-            text="ℹ️ Información Básica",
-            font=('Arial', 12, 'bold'),
-            bg='white',
-            fg=self.color_primario,
-            relief='ridge',
-            bd=2
+    def _crear_tab_informacion(self):
+        """Tab 1: Información del Paciente"""
+        tab = tk.Frame(self.notebook, bg=self.colores['bg_main'])
+        self.notebook.add(tab, text='👤 Información')
+        self.tabs['info'] = tab
+        
+        # Canvas con scroll
+        canvas = tk.Canvas(tab, bg=self.colores['bg_main'], highlightthickness=0)
+        scrollbar = ttk.Scrollbar(tab, orient='vertical', command=canvas.yview)
+        frame_contenido = tk.Frame(canvas, bg=self.colores['bg_main'])
+        
+        frame_contenido.bind(
+            '<Configure>',
+            lambda e: canvas.configure(scrollregion=canvas.bbox('all'))
         )
-        frame.pack(fill='x', pady=(0, 10), padx=5)
         
-        # Nombre
-        frame_nombre = tk.Frame(frame, bg='white')
-        frame_nombre.pack(fill='x', padx=15, pady=8)
+        canvas.create_window((0, 0), window=frame_contenido, anchor='nw')
+        canvas.configure(yscrollcommand=scrollbar.set)
         
-        tk.Label(
-            frame_nombre,
-            text="Nombre:",
-            font=('Arial', 11, 'bold'),
-            bg='white',
-            fg=self.color_primario
-        ).pack(side='left')
+        canvas.pack(side='left', fill='both', expand=True, padx=10, pady=10)
+        scrollbar.pack(side='right', fill='y')
         
-        self.label_nombre = tk.Label(
-            frame_nombre,
-            text="",
-            font=('Arial', 11),
-            bg='white',
-            fg='#333'
-        )
-        self.label_nombre.pack(side='left', padx=10)
+        self.widgets['frame_info'] = frame_contenido
         
-        # Apellido
-        frame_apellido = tk.Frame(frame, bg='white')
-        frame_apellido.pack(fill='x', padx=15, pady=8)
+        # Card de información
+        self._crear_card_informacion(frame_contenido)
+    
+    def _crear_card_informacion(self, parent):
+        """Crear card de información del paciente"""
+        card = self._crear_card(parent, "Datos del Paciente")
         
-        tk.Label(
-            frame_apellido,
-            text="Apellido:",
-            font=('Arial', 11, 'bold'),
-            bg='white',
-            fg=self.color_primario
-        ).pack(side='left')
+        # Contenedor de datos
+        frame_datos = tk.Frame(card, bg=self.colores['bg_card'])
+        frame_datos.pack(fill='x', padx=20, pady=10)
         
-        self.label_apellido = tk.Label(
-            frame_apellido,
-            text="",
-            font=('Arial', 11),
-            bg='white',
-            fg='#333'
-        )
-        self.label_apellido.pack(side='left', padx=10)
+        # Función helper para crear fila de dato
+        def crear_fila_dato(texto_label, row):
+            frame = tk.Frame(frame_datos, bg=self.colores['bg_card'])
+            frame.grid(row=row, column=0, columnspan=2, sticky='ew', pady=8)
+            
+            tk.Label(
+                frame,
+                text=texto_label,
+                font=('Segoe UI', 10, 'bold'),
+                bg=self.colores['bg_card'],
+                fg=self.colores['text_medium'],
+                width=12,
+                anchor='w'
+            ).pack(side='left')
+            
+            label_valor = tk.Label(
+                frame,
+                text="",
+                font=('Segoe UI', 11),
+                bg=self.colores['bg_card'],
+                fg=self.colores['text_dark'],
+                anchor='w'
+            )
+            label_valor.pack(side='left', fill='x', expand=True)
+            
+            return label_valor
         
-        # DNI
-        frame_dni = tk.Frame(frame, bg='white')
-        frame_dni.pack(fill='x', padx=15, pady=8)
+        # Crear campos
+        self.widgets['label_nombre'] = crear_fila_dato("Nombre:", 0)
+        self.widgets['label_apellido'] = crear_fila_dato("Apellido:", 1)
+        self.widgets['label_dni'] = crear_fila_dato("DNI:", 2)
+        self.widgets['label_edad'] = crear_fila_dato("Edad:", 3)
+        self.widgets['label_sexo'] = crear_fila_dato("Sexo:", 4)
+        self.widgets['label_fecha'] = crear_fila_dato("Registro:", 5)
         
-        tk.Label(
-            frame_dni,
-            text="DNI:",
-            font=('Arial', 11, 'bold'),
-            bg='white',
-            fg=self.color_primario
-        ).pack(side='left')
-        
-        self.label_dni = tk.Label(
-            frame_dni,
-            text="",
-            font=('Arial', 11),
-            bg='white',
-            fg='#333'
-        )
-        self.label_dni.pack(side='left', padx=10)
-        
-        # Edad y Sexo
-        frame_edad_sexo = tk.Frame(frame, bg='white')
-        frame_edad_sexo.pack(fill='x', padx=15, pady=8)
-        
-        tk.Label(
-            frame_edad_sexo,
-            text="Edad:",
-            font=('Arial', 11, 'bold'),
-            bg='white',
-            fg=self.color_primario
-        ).pack(side='left')
-        
-        self.label_edad = tk.Label(
-            frame_edad_sexo,
-            text="",
-            font=('Arial', 11),
-            bg='white',
-            fg='#333'
-        )
-        self.label_edad.pack(side='left', padx=10)
-        
-        tk.Label(
-            frame_edad_sexo,
-            text="  |  Sexo:",
-            font=('Arial', 11, 'bold'),
-            bg='white',
-            fg=self.color_primario
-        ).pack(side='left', padx=(20, 0))
-        
-        self.label_sexo = tk.Label(
-            frame_edad_sexo,
-            text="",
-            font=('Arial', 11),
-            bg='white',
-            fg='#333'
-        )
-        self.label_sexo.pack(side='left', padx=10)
-        
-        # Fecha registro
-        frame_fecha = tk.Frame(frame, bg='white')
-        frame_fecha.pack(fill='x', padx=15, pady=8)
-        
-        tk.Label(
-            frame_fecha,
-            text="Registro:",
-            font=('Arial', 11, 'bold'),
-            bg='white',
-            fg=self.color_primario
-        ).pack(side='left')
-        
-        self.label_fecha = tk.Label(
-            frame_fecha,
-            text="",
-            font=('Arial', 11),
-            bg='white',
-            fg='#333'
-        )
-        self.label_fecha.pack(side='left', padx=10)
+        frame_datos.columnconfigure(0, weight=1)
         
         # Botón de edición
-        frame_boton = tk.Frame(frame, bg='white')
-        frame_boton.pack(fill='x', padx=15, pady=15)
+        frame_btn = tk.Frame(card, bg=self.colores['bg_card'])
+        frame_btn.pack(fill='x', padx=20, pady=(10, 20))
         
         btn_editar = tk.Button(
-            frame_boton,
+            frame_btn,
             text="✏️ Editar Información",
-            font=('Arial', 11, 'bold'),
-            bg=self.color_secundario,
-            fg='white',
+            font=('Segoe UI', 11, 'bold'),
+            bg=self.colores['primary'],
+            fg=self.colores['text_white'],
             relief='flat',
-            padx=20,
-            pady=10,
+            bd=0,
+            padx=25,
+            pady=12,
             cursor='hand2',
             command=self.abrir_ventana_edicion
         )
         btn_editar.pack()
-    
-    def _crear_seccion_nivel(self):
-        """Crear sección de modificación de nivel"""
-        frame = tk.LabelFrame(
-            self.frame_detalles,
-            text="🎯 Gestión de Nivel Terapéutico",
-            font=('Arial', 12, 'bold'),
-            bg='white',
-            fg=self.color_primario,
-            relief='ridge',
-            bd=2
-        )
-        frame.pack(fill='x', pady=(0, 10), padx=5)
         
-        # Nivel actual
-        frame_actual = tk.Frame(frame, bg='white')
-        frame_actual.pack(fill='x', padx=15, pady=10)
+        # Efecto hover
+        btn_editar.bind('<Enter>', lambda e: btn_editar.config(bg=self.colores['primary_dark']))
+        btn_editar.bind('<Leave>', lambda e: btn_editar.config(bg=self.colores['primary']))
+    
+    def _crear_tab_terapia(self):
+        """Tab 2: Gestión de Terapia"""
+        tab = tk.Frame(self.notebook, bg=self.colores['bg_main'])
+        self.notebook.add(tab, text='🎯 Terapia')
+        self.tabs['terapia'] = tab
+        
+        # Canvas con scroll
+        canvas = tk.Canvas(tab, bg=self.colores['bg_main'], highlightthickness=0)
+        scrollbar = ttk.Scrollbar(tab, orient='vertical', command=canvas.yview)
+        frame_contenido = tk.Frame(canvas, bg=self.colores['bg_main'])
+        
+        frame_contenido.bind(
+            '<Configure>',
+            lambda e: canvas.configure(scrollregion=canvas.bbox('all'))
+        )
+        
+        canvas.create_window((0, 0), window=frame_contenido, anchor='nw')
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        canvas.pack(side='left', fill='both', expand=True, padx=10, pady=10)
+        scrollbar.pack(side='right', fill='y')
+        
+        self.widgets['frame_terapia'] = frame_contenido
+        
+        # Cards
+        self._crear_card_nivel(frame_contenido)
+        self._crear_card_observaciones(frame_contenido)
+    
+    def _crear_card_nivel(self, parent):
+        """Crear card de gestión de nivel"""
+        card = self._crear_card(parent, "Nivel Terapéutico Actual")
+        
+        # Nivel actual (grande y destacado)
+        frame_nivel = tk.Frame(card, bg=self.colores['bg_card'])
+        frame_nivel.pack(fill='x', padx=20, pady=15)
         
         tk.Label(
-            frame_actual,
-            text="Nivel Actual:",
-            font=('Arial', 11, 'bold'),
-            bg='white',
-            fg=self.color_primario
-        ).pack(side='left')
+            frame_nivel,
+            text="Nivel:",
+            font=('Segoe UI', 11),
+            bg=self.colores['bg_card'],
+            fg=self.colores['text_medium']
+        ).pack()
         
-        self.label_nivel = tk.Label(
-            frame_actual,
+        self.widgets['label_nivel'] = tk.Label(
+            frame_nivel,
             text="",
-            font=('Arial', 14, 'bold'),
-            bg='white',
-            fg=self.color_secundario
+            font=('Segoe UI', 24, 'bold'),
+            bg=self.colores['bg_card'],
+            fg=self.colores['primary']
         )
-        self.label_nivel.pack(side='left', padx=10)
+        self.widgets['label_nivel'].pack(pady=5)
+        
+        # Separador
+        tk.Frame(card, bg=self.colores['border_light'], height=1).pack(fill='x', padx=20, pady=10)
         
         # Selector de nuevo nivel
-        frame_selector = tk.Frame(frame, bg='white')
-        frame_selector.pack(fill='x', padx=15, pady=10)
+        frame_cambio = tk.Frame(card, bg=self.colores['bg_card'])
+        frame_cambio.pack(fill='x', padx=20, pady=10)
         
         tk.Label(
-            frame_selector,
+            frame_cambio,
             text="Cambiar a:",
-            font=('Arial', 11, 'bold'),
-            bg='white',
-            fg=self.color_primario
-        ).pack(side='left')
+            font=('Segoe UI', 10, 'bold'),
+            bg=self.colores['bg_card'],
+            fg=self.colores['text_dark']
+        ).pack(anchor='w', pady=(0, 5))
         
         niveles = [nivel.name for nivel in NivelTerapia]
-        self.combo_nivel = ttk.Combobox(
-            frame_selector,
+        self.widgets['combo_nivel'] = ttk.Combobox(
+            frame_cambio,
             values=niveles,
             state='readonly',
-            font=('Arial', 11),
-            width=20
+            font=('Segoe UI', 10),
+            width=25
         )
-        self.combo_nivel.pack(side='left', padx=10)
+        self.widgets['combo_nivel'].pack(fill='x', pady=(0, 10))
         
-        # Botón de acción
-        frame_botones = tk.Frame(frame, bg='white')
-        frame_botones.pack(fill='x', padx=15, pady=10)
-        
+        # Botón aplicar
         btn_aplicar = tk.Button(
-            frame_botones,
-            text="✓ Aplicar Cambio de Nivel",
-            font=('Arial', 12, 'bold'),
-            bg=self.color_exito,
-            fg='white',
+            frame_cambio,
+            text="✓ Aplicar Cambio",
+            font=('Segoe UI', 11, 'bold'),
+            bg=self.colores['success'],
+            fg=self.colores['text_white'],
             relief='flat',
-            padx=25,
+            bd=0,
+            padx=20,
             pady=10,
             cursor='hand2',
             command=self.cambiar_nivel
         )
-        btn_aplicar.pack(pady=5)
+        btn_aplicar.pack(fill='x')
         
-        # Observaciones
-        frame_obs = tk.Frame(frame, bg='white')
-        frame_obs.pack(fill='both', expand=True, padx=15, pady=10)
+        # Efecto hover
+        btn_aplicar.bind('<Enter>', lambda e: btn_aplicar.config(bg='#0ea872'))
+        btn_aplicar.bind('<Leave>', lambda e: btn_aplicar.config(bg=self.colores['success']))
+    
+    def _crear_card_observaciones(self, parent):
+        """Crear card de observaciones"""
+        card = self._crear_card(parent, "Observaciones del Terapeuta")
         
-        tk.Label(
+        frame_obs = tk.Frame(card, bg=self.colores['bg_card'])
+        frame_obs.pack(fill='both', expand=True, padx=20, pady=10)
+        
+        self.widgets['text_observaciones'] = scrolledtext.ScrolledText(
             frame_obs,
-            text="📝 Observaciones del terapeuta:",
-            font=('Arial', 11, 'bold'),
-            bg='white',
-            fg=self.color_primario
-        ).pack(anchor='w', pady=(0, 5))
-        
-        self.text_observaciones = scrolledtext.ScrolledText(
-            frame_obs,
-            height=4,
-            font=('Arial', 10),
+            height=6,
+            font=('Segoe UI', 10),
             wrap='word',
             relief='solid',
-            bd=1
+            bd=1,
+            borderwidth=1
         )
-        self.text_observaciones.pack(fill='both', expand=True)
+        self.widgets['text_observaciones'].pack(fill='both', expand=True, pady=(0, 10))
         
-        btn_guardar_obs = tk.Button(
-            frame,
+        # Botón guardar
+        btn_guardar = tk.Button(
+            frame_obs,
             text="💾 Guardar Observaciones",
-            font=('Arial', 10),
-            bg=self.color_secundario,
-            fg='white',
+            font=('Segoe UI', 10, 'bold'),
+            bg=self.colores['primary'],
+            fg=self.colores['text_white'],
             relief='flat',
-            padx=15,
-            pady=5,
+            bd=0,
+            padx=20,
+            pady=10,
             cursor='hand2',
             command=self.guardar_observaciones
         )
-        btn_guardar_obs.pack(pady=10)
+        btn_guardar.pack()
+        
+        # Efecto hover
+        btn_guardar.bind('<Enter>', lambda e: btn_guardar.config(bg=self.colores['primary_dark']))
+        btn_guardar.bind('<Leave>', lambda e: btn_guardar.config(bg=self.colores['primary']))
     
-    def _crear_seccion_progreso(self):
-        """Crear sección de progreso con gráfico"""
-        frame = tk.LabelFrame(
-            self.frame_detalles,
-            text="📈 Progreso de Sesiones",
-            font=('Arial', 12, 'bold'),
-            bg='white',
-            fg=self.color_primario,
-            relief='ridge',
-            bd=2
+    def _crear_tab_progreso(self):
+        """Tab 3: Progreso y Estadísticas"""
+        tab = tk.Frame(self.notebook, bg=self.colores['bg_main'])
+        self.notebook.add(tab, text='📈 Progreso')
+        self.tabs['progreso'] = tab
+        
+        # Canvas con scroll
+        canvas = tk.Canvas(tab, bg=self.colores['bg_main'], highlightthickness=0)
+        scrollbar = ttk.Scrollbar(tab, orient='vertical', command=canvas.yview)
+        frame_contenido = tk.Frame(canvas, bg=self.colores['bg_main'])
+        
+        frame_contenido.bind(
+            '<Configure>',
+            lambda e: canvas.configure(scrollregion=canvas.bbox('all'))
         )
-        frame.pack(fill='both', expand=True, pady=(0, 10), padx=5)
         
-        # Estadísticas rápidas
-        self.frame_stats = tk.Frame(frame, bg='white')
-        self.frame_stats.pack(fill='x', padx=15, pady=10)
+        canvas.create_window((0, 0), window=frame_contenido, anchor='nw')
+        canvas.configure(yscrollcommand=scrollbar.set)
         
-        # Frame para el gráfico
-        self.frame_grafico = tk.Frame(frame, bg='white')
-        self.frame_grafico.pack(fill='both', expand=True, padx=15, pady=10)
+        canvas.pack(side='left', fill='both', expand=True, padx=10, pady=10)
+        scrollbar.pack(side='right', fill='y')
+        
+        self.widgets['frame_progreso'] = frame_contenido
+        
+        # Estadísticas
+        self._crear_estadisticas_rapidas(frame_contenido)
+        
+        # Gráfico
+        self._crear_card_grafico(frame_contenido)
     
-    def _crear_seccion_historial(self):
-        """Crear sección de historial de sesiones"""
-        frame = tk.LabelFrame(
-            self.frame_detalles,
-            text="📅 Historial de Sesiones",
-            font=('Arial', 12, 'bold'),
-            bg='white',
-            fg=self.color_primario,
-            relief='ridge',
-            bd=2
-        )
-        frame.pack(fill='both', expand=True, padx=5)
+    def _crear_estadisticas_rapidas(self, parent):
+        """Crear cards de estadísticas rápidas"""
+        frame_stats = tk.Frame(parent, bg=self.colores['bg_main'])
+        frame_stats.pack(fill='x', pady=(0, 10))
         
-        # Treeview para historial
-        columnas = ('Fecha', 'Nivel', 'Correctos', 'Fallidos', 'Tasa')
-        self.tree_historial = ttk.Treeview(
-            frame,
+        self.widgets['frame_stats'] = frame_stats
+        
+        # Se llenará dinámicamente al seleccionar usuario
+    
+    def _crear_card_grafico(self, parent):
+        """Crear card para gráfico de progreso"""
+        card = self._crear_card(parent, "Evolución del Desempeño")
+        
+        self.widgets['frame_grafico'] = tk.Frame(card, bg=self.colores['bg_card'])
+        self.widgets['frame_grafico'].pack(fill='both', expand=True, padx=20, pady=20)
+    
+    def _crear_tab_historial(self):
+        """Tab 4: Historial de Sesiones"""
+        tab = tk.Frame(self.notebook, bg=self.colores['bg_main'])
+        self.notebook.add(tab, text='📅 Historial')
+        self.tabs['historial'] = tab
+        
+        frame_contenido = tk.Frame(tab, bg=self.colores['bg_main'])
+        frame_contenido.pack(fill='both', expand=True, padx=10, pady=10)
+        
+        # Card con tabla
+        card = self._crear_card(frame_contenido, "Historial de Sesiones")
+        
+        # Treeview
+        columnas = ('Fecha', 'Nivel', 'Correctos', 'Fallidos', 'Éxito %')
+        self.widgets['tree_historial'] = ttk.Treeview(
+            card,
             columns=columnas,
             show='headings',
-            height=8
+            height=12
         )
         
-        self.tree_historial.heading('Fecha', text='Fecha')
-        self.tree_historial.heading('Nivel', text='Nivel')
-        self.tree_historial.heading('Correctos', text='✓ Correctos')
-        self.tree_historial.heading('Fallidos', text='✗ Fallidos')
-        self.tree_historial.heading('Tasa', text='% Éxito')
+        self.widgets['tree_historial'].heading('Fecha', text='Fecha')
+        self.widgets['tree_historial'].heading('Nivel', text='Nivel')
+        self.widgets['tree_historial'].heading('Correctos', text='✓ Correctos')
+        self.widgets['tree_historial'].heading('Fallidos', text='✗ Fallidos')
+        self.widgets['tree_historial'].heading('Éxito %', text='% Éxito')
         
-        self.tree_historial.column('Fecha', width=150)
-        self.tree_historial.column('Nivel', width=120)
-        self.tree_historial.column('Correctos', width=100, anchor='center')
-        self.tree_historial.column('Fallidos', width=100, anchor='center')
-        self.tree_historial.column('Tasa', width=100, anchor='center')
+        self.widgets['tree_historial'].column('Fecha', width=140)
+        self.widgets['tree_historial'].column('Nivel', width=100)
+        self.widgets['tree_historial'].column('Correctos', width=80, anchor='center')
+        self.widgets['tree_historial'].column('Fallidos', width=80, anchor='center')
+        self.widgets['tree_historial'].column('Éxito %', width=80, anchor='center')
         
-        self.tree_historial.pack(fill='both', expand=True, padx=10, pady=10)
+        self.widgets['tree_historial'].pack(fill='both', expand=True, padx=20, pady=20)
+    
+    def _crear_card(self, parent, titulo):
+        """Helper: Crear card moderno con sombra sutil"""
+        # Frame externo para sombra
+        frame_shadow = tk.Frame(parent, bg='#D1D5DB')
+        frame_shadow.pack(fill='both', expand=True, pady=(0, 15))
+        
+        # Card principal
+        card = tk.Frame(
+            frame_shadow,
+            bg=self.colores['bg_card'],
+            relief='flat',
+            bd=0
+        )
+        card.pack(fill='both', expand=True, padx=1, pady=1)
+        
+        # Borde
+        card.configure(highlightbackground=self.colores['border_light'], highlightthickness=1)
+        
+        # Header del card
+        if titulo:
+            header = tk.Frame(card, bg=self.colores['bg_card'])
+            header.pack(fill='x', padx=20, pady=(15, 10))
+            
+            tk.Label(
+                header,
+                text=titulo,
+                font=('Segoe UI', 12, 'bold'),
+                bg=self.colores['bg_card'],
+                fg=self.colores['text_dark']
+            ).pack(side='left')
+        
+        return card
+    
+    def _crear_stat_card(self, parent, titulo, valor, color):
+        """Helper: Crear mini-card de estadística"""
+        card = tk.Frame(
+            parent,
+            bg=color,
+            relief='flat',
+            bd=0
+        )
+        card.pack(side='left', fill='both', expand=True, padx=5)
+        
+        # Borde sutil
+        card.configure(highlightbackground=self.colores['border_medium'], highlightthickness=1)
+        
+        tk.Label(
+            card,
+            text=titulo,
+            font=('Segoe UI', 9),
+            bg=color,
+            fg=self.colores['text_white']
+        ).pack(pady=(12, 2))
+        
+        tk.Label(
+            card,
+            text=valor,
+            font=('Segoe UI', 20, 'bold'),
+            bg=color,
+            fg=self.colores['text_white']
+        ).pack(pady=(2, 12))
+        
+        return card
     
     def _mostrar_mensaje_inicial(self):
         """Mostrar mensaje cuando no hay usuario seleccionado"""
-        for widget in self.frame_detalles.winfo_children():
-            widget.pack_forget()
-        
-        label = tk.Label(
-            self.frame_detalles,
-            text="👈 Selecciona un paciente de la lista",
-            font=('Arial', 16),
-            bg=self.color_fondo,
-            fg='#999'
-        )
-        label.pack(expand=True)
+        for tab_name, tab_frame in self.tabs.items():
+            # Limpiar contenido
+            for widget in tab_frame.winfo_children():
+                widget.destroy()
+            
+            # Mensaje
+            label = tk.Label(
+                tab_frame,
+                text="👈 Selecciona un paciente\nde la lista",
+                font=('Segoe UI', 14),
+                bg=self.colores['bg_main'],
+                fg=self.colores['text_light'],
+                justify='center'
+            )
+            label.place(relx=0.5, rely=0.5, anchor='center')
+    
+    # ========== CARGA DE DATOS ==========
     
     def cargar_usuarios(self):
         """Cargar lista de usuarios"""
-        # Limpiar tree
         for item in self.tree_usuarios.get_children():
             self.tree_usuarios.delete(item)
         
-        # Obtener personas de la BD
         try:
             conn = self.db.conn
             cursor = conn.cursor()
@@ -608,15 +735,10 @@ class PanelTerapeuta:
                     p.personId,
                     p.name,
                     p.apellido,
-                    p.age,
                     p.sex,
-                    p.dni,
-                    l.name as nivel,
-                    COUNT(DISTINCT s.sesionId) as num_sesiones
+                    l.name as nivel
                 FROM person p
                 LEFT JOIN level l ON p.actual_level = l.levelId
-                LEFT JOIN sesion s ON p.personId = s.personId
-                GROUP BY p.personId
                 ORDER BY p.personId DESC
             """)
             
@@ -625,29 +747,26 @@ class PanelTerapeuta:
             for persona in personas:
                 sexo_icono = "👦" if persona['sex'] == 'M' else "👧" if persona['sex'] == 'F' else "👤"
                 
-                # Construir nombre completo
                 nombre_completo = persona['name']
                 if persona['apellido']:
                     nombre_completo += f" {persona['apellido']}"
                 
-                self.tree_usuarios.insert(
+                # Agregar con ID oculto
+                item_id = self.tree_usuarios.insert(
                     '',
                     'end',
                     values=(
-                        persona['personId'],
                         f"{sexo_icono} {nombre_completo}",
-                        f"{persona['age']} años",
-                        persona['nivel'] or 'N/A',
-                        persona['num_sesiones']
+                        persona['nivel'] or 'N/A'
                     )
                 )
+                # Guardar ID en tags para recuperarlo después
+                self.tree_usuarios.item(item_id, tags=(str(persona['personId']),))
             
             print(f"✅ Cargados {len(personas)} pacientes")
             
         except Exception as e:
             print(f"❌ Error al cargar usuarios: {e}")
-            import traceback
-            traceback.print_exc()
             messagebox.showerror("Error", f"No se pudieron cargar los usuarios:\n{e}")
     
     def on_seleccionar_usuario(self, event):
@@ -656,15 +775,16 @@ class PanelTerapeuta:
         if not seleccion:
             return
         
+        # Obtener ID desde tags
         item = self.tree_usuarios.item(seleccion[0])
-        person_id = item['values'][0]
-        
-        self.cargar_detalles_usuario(person_id)
+        tags = item['tags']
+        if tags:
+            person_id = int(tags[0])
+            self.cargar_detalles_usuario(person_id)
     
     def cargar_detalles_usuario(self, person_id: int):
         """Cargar detalles completos de un usuario"""
         try:
-            # Obtener persona
             conn = self.db.conn
             cursor = conn.cursor()
             
@@ -684,6 +804,7 @@ class PanelTerapeuta:
             self.persona_seleccionada = {
                 'person_id': persona_row['personId'],
                 'name': persona_row['name'],
+                'apellido': persona_row['apellido'] if 'apellido' in persona_row.keys() else None,
                 'age': persona_row['age'],
                 'dni': persona_row['dni'] if 'dni' in persona_row.keys() else None,
                 'sex': persona_row['sex'] if 'sex' in persona_row.keys() else None,
@@ -692,49 +813,14 @@ class PanelTerapeuta:
                 'fecha_registro': persona_row['register_date']
             }
             
-            # Mostrar secciones
-            for widget in self.frame_detalles.winfo_children():
-                widget.pack(fill='x', pady=(0, 10), padx=5)
+            # Recrear pestañas con contenido
+            self._recrear_tabs_con_contenido()
             
-            # Actualizar información básica
-            self.label_nombre.config(text=persona_row['name'])
-            
-            # Apellido
-            apellido_text = persona_row['apellido'] if 'apellido' in persona_row.keys() and persona_row['apellido'] else "No registrado"
-            self.label_apellido.config(text=apellido_text)
-            
-            dni_text = persona_row['dni'] if persona_row['dni'] else "No registrado"
-            self.label_dni.config(text=dni_text)
-            
-            self.label_edad.config(text=f"{persona_row['age']} años")
-            
-            sexo_text = "Masculino" if persona_row['sex'] == 'M' else "Femenino" if persona_row['sex'] == 'F' else "No registrado"
-            self.label_sexo.config(text=sexo_text)
-            
-            fecha_registro = persona_row['register_date']
-            if fecha_registro:
-                try:
-                    fecha_obj = datetime.fromisoformat(fecha_registro)
-                    fecha_formateada = fecha_obj.strftime('%d/%m/%Y')
-                except:
-                    fecha_formateada = fecha_registro
-            else:
-                fecha_formateada = "N/A"
-            
-            self.label_fecha.config(text=fecha_formateada)
-            
-            # Actualizar nivel
-            self.label_nivel.config(text=persona_row['nivel_nombre'] or 'N/A')
-            self.combo_nivel.set(persona_row['nivel_nombre'] or '')
-            
-            # Cargar historial
-            self._cargar_historial_sesiones(person_id)
-            
-            # Cargar gráfico de progreso
-            self._cargar_grafico_progreso(person_id)
-            
-            # Cargar observaciones
-            self._cargar_observaciones(person_id)
+            # Cargar datos en cada tab
+            self._cargar_tab_informacion()
+            self._cargar_tab_terapia()
+            self._cargar_tab_progreso()
+            self._cargar_tab_historial()
             
             print(f"✅ Detalles cargados para: {persona_row['name']}")
             
@@ -742,185 +828,273 @@ class PanelTerapeuta:
             print(f"❌ Error al cargar detalles: {e}")
             import traceback
             traceback.print_exc()
-            messagebox.showerror("Error", f"No se pudieron cargar los detalles:\n{e}")
     
-    def _cargar_historial_sesiones(self, person_id: int):
-        """Cargar historial de sesiones del usuario"""
-        # Limpiar tree
-        for item in self.tree_historial.get_children():
-            self.tree_historial.delete(item)
+    def _recrear_tabs_con_contenido(self):
+        """Recrear pestañas con contenido real"""
+        # Limpiar mensaje inicial de todos los tabs
+        for tab_frame in self.tabs.values():
+            for widget in tab_frame.winfo_children():
+                widget.destroy()
+        
+        # Recrear estructura de cada tab
+        # Tab Info
+        tab_info = self.tabs['info']
+        canvas = tk.Canvas(tab_info, bg=self.colores['bg_main'], highlightthickness=0)
+        scrollbar = ttk.Scrollbar(tab_info, orient='vertical', command=canvas.yview)
+        frame_contenido = tk.Frame(canvas, bg=self.colores['bg_main'])
+        
+        frame_contenido.bind('<Configure>', lambda e: canvas.configure(scrollregion=canvas.bbox('all')))
+        canvas.create_window((0, 0), window=frame_contenido, anchor='nw')
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        canvas.pack(side='left', fill='both', expand=True, padx=10, pady=10)
+        scrollbar.pack(side='right', fill='y')
+        
+        self.widgets['frame_info'] = frame_contenido
+        self._crear_card_informacion(frame_contenido)
+        
+        # Tab Terapia
+        tab_terapia = self.tabs['terapia']
+        canvas = tk.Canvas(tab_terapia, bg=self.colores['bg_main'], highlightthickness=0)
+        scrollbar = ttk.Scrollbar(tab_terapia, orient='vertical', command=canvas.yview)
+        frame_contenido = tk.Frame(canvas, bg=self.colores['bg_main'])
+        
+        frame_contenido.bind('<Configure>', lambda e: canvas.configure(scrollregion=canvas.bbox('all')))
+        canvas.create_window((0, 0), window=frame_contenido, anchor='nw')
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        canvas.pack(side='left', fill='both', expand=True, padx=10, pady=10)
+        scrollbar.pack(side='right', fill='y')
+        
+        self.widgets['frame_terapia'] = frame_contenido
+        self._crear_card_nivel(frame_contenido)
+        self._crear_card_observaciones(frame_contenido)
+        
+        # Tab Progreso
+        tab_progreso = self.tabs['progreso']
+        canvas = tk.Canvas(tab_progreso, bg=self.colores['bg_main'], highlightthickness=0)
+        scrollbar = ttk.Scrollbar(tab_progreso, orient='vertical', command=canvas.yview)
+        frame_contenido = tk.Frame(canvas, bg=self.colores['bg_main'])
+        
+        frame_contenido.bind('<Configure>', lambda e: canvas.configure(scrollregion=canvas.bbox('all')))
+        canvas.create_window((0, 0), window=frame_contenido, anchor='nw')
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        canvas.pack(side='left', fill='both', expand=True, padx=10, pady=10)
+        scrollbar.pack(side='right', fill='y')
+        
+        self.widgets['frame_progreso'] = frame_contenido
+        self._crear_estadisticas_rapidas(frame_contenido)
+        self._crear_card_grafico(frame_contenido)
+        
+        # Tab Historial
+        tab_historial = self.tabs['historial']
+        frame_contenido = tk.Frame(tab_historial, bg=self.colores['bg_main'])
+        frame_contenido.pack(fill='both', expand=True, padx=10, pady=10)
+        
+        card = self._crear_card(frame_contenido, "Historial de Sesiones")
+        
+        columnas = ('Fecha', 'Nivel', 'Correctos', 'Fallidos', 'Éxito %')
+        self.widgets['tree_historial'] = ttk.Treeview(card, columns=columnas, show='headings', height=12)
+        
+        self.widgets['tree_historial'].heading('Fecha', text='Fecha')
+        self.widgets['tree_historial'].heading('Nivel', text='Nivel')
+        self.widgets['tree_historial'].heading('Correctos', text='✓ Correctos')
+        self.widgets['tree_historial'].heading('Fallidos', text='✗ Fallidos')
+        self.widgets['tree_historial'].heading('Éxito %', text='% Éxito')
+        
+        self.widgets['tree_historial'].column('Fecha', width=140)
+        self.widgets['tree_historial'].column('Nivel', width=100)
+        self.widgets['tree_historial'].column('Correctos', width=80, anchor='center')
+        self.widgets['tree_historial'].column('Fallidos', width=80, anchor='center')
+        self.widgets['tree_historial'].column('Éxito %', width=80, anchor='center')
+        
+        self.widgets['tree_historial'].pack(fill='both', expand=True, padx=20, pady=20)
+    
+    def _cargar_tab_informacion(self):
+        """Cargar datos en tab de información"""
+        if not self.persona_seleccionada:
+            return
+        
+        p = self.persona_seleccionada
+        
+        self.widgets['label_nombre'].config(text=p['name'])
+        self.widgets['label_apellido'].config(text=p['apellido'] if p['apellido'] else "No registrado")
+        self.widgets['label_dni'].config(text=p['dni'] if p['dni'] else "No registrado")
+        self.widgets['label_edad'].config(text=f"{p['age']} años")
+        
+        sexo_text = "Masculino" if p['sex'] == 'M' else "Femenino" if p['sex'] == 'F' else "No registrado"
+        self.widgets['label_sexo'].config(text=sexo_text)
+        
+        if p['fecha_registro']:
+            try:
+                fecha_obj = datetime.fromisoformat(p['fecha_registro'])
+                fecha_formateada = fecha_obj.strftime('%d/%m/%Y')
+            except:
+                fecha_formateada = p['fecha_registro']
+        else:
+            fecha_formateada = "N/A"
+        
+        self.widgets['label_fecha'].config(text=fecha_formateada)
+    
+    def _cargar_tab_terapia(self):
+        """Cargar datos en tab de terapia"""
+        if not self.persona_seleccionada:
+            return
+        
+        self.widgets['label_nivel'].config(text=self.persona_seleccionada['nivel_nombre'] or 'N/A')
+        self.widgets['combo_nivel'].set(self.persona_seleccionada['nivel_nombre'] or '')
+        
+        # Cargar observaciones
+        self.widgets['text_observaciones'].delete("1.0", "end")
         
         try:
-            sesiones = self.db.obtener_sesiones_por_persona(person_id)
+            observaciones = self.db.obtener_observaciones_persona(self.persona_seleccionada['person_id'])
+            if observaciones:
+                self.widgets['text_observaciones'].insert("1.0", observaciones[0]['observacion'])
+        except:
+            pass
+    
+    def _cargar_tab_progreso(self):
+        """Cargar datos en tab de progreso"""
+        if not self.persona_seleccionada:
+            return
+        
+        try:
+            sesiones = self.db.obtener_sesiones_por_persona(self.persona_seleccionada['person_id'])
+            
+            # Limpiar frame de stats
+            for widget in self.widgets['frame_stats'].winfo_children():
+                widget.destroy()
+            
+            if not sesiones:
+                label = tk.Label(
+                    self.widgets['frame_stats'],
+                    text="Sin sesiones registradas",
+                    font=('Segoe UI', 12),
+                    bg=self.colores['bg_main'],
+                    fg=self.colores['text_light']
+                )
+                label.pack(expand=True)
+                return
+            
+            # Estadísticas
+            total = len(sesiones)
+            ultima = sesiones[-1]
+            promedio = sum(s.tasa_exito for s in sesiones) / total * 100
+            
+            self._crear_stat_card(
+                self.widgets['frame_stats'],
+                "Total Sesiones",
+                str(total),
+                self.colores['info']
+            )
+            self._crear_stat_card(
+                self.widgets['frame_stats'],
+                "Última Tasa",
+                f"{ultima.tasa_exito * 100:.0f}%",
+                self.colores['success']
+            )
+            self._crear_stat_card(
+                self.widgets['frame_stats'],
+                "Promedio",
+                f"{promedio:.1f}%",
+                self.colores['warning']
+            )
+            
+            # Gráfico
+            self._crear_grafico_progreso(sesiones)
+            
+        except Exception as e:
+            print(f"❌ Error al cargar progreso: {e}")
+    
+    def _crear_grafico_progreso(self, sesiones):
+        """Crear gráfico de progreso"""
+        # Limpiar frame
+        for widget in self.widgets['frame_grafico'].winfo_children():
+            widget.destroy()
+        
+        try:
+            # Preparar datos (últimas 10 sesiones)
+            fechas = [s.fecha.strftime('%d/%m') for s in sesiones[-10:]]
+            tasas = [s.tasa_exito * 100 for s in sesiones[-10:]]
+            
+            # Crear figura
+            fig = Figure(figsize=(5, 3), dpi=90)
+            ax = fig.add_subplot(111)
+            
+            # Gráfico
+            ax.plot(fechas, tasas, marker='o', linewidth=2, markersize=6, color=self.colores['primary'])
+            ax.axhline(y=80, color=self.colores['success'], linestyle='--', alpha=0.7, label='Meta 80%')
+            ax.axhline(y=70, color=self.colores['warning'], linestyle='--', alpha=0.7, label='Mínimo 70%')
+            
+            ax.set_xlabel('Fecha', fontsize=9)
+            ax.set_ylabel('Tasa de Éxito (%)', fontsize=9)
+            ax.set_title('Evolución (últimas 10 sesiones)', fontsize=10, fontweight='bold')
+            ax.grid(True, alpha=0.2)
+            ax.legend(fontsize=8)
+            ax.set_ylim(0, 105)
+            
+            plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right', fontsize=8)
+            ax.tick_params(axis='y', labelsize=8)
+            
+            fig.tight_layout()
+            
+            # Agregar a tkinter
+            canvas = FigureCanvasTkAgg(fig, self.widgets['frame_grafico'])
+            canvas.draw()
+            canvas.get_tk_widget().pack(fill='both', expand=True)
+            
+        except Exception as e:
+            print(f"❌ Error al crear gráfico: {e}")
+    
+    def _cargar_tab_historial(self):
+        """Cargar datos en tab de historial"""
+        if not self.persona_seleccionada:
+            return
+        
+        # Limpiar tree
+        for item in self.widgets['tree_historial'].get_children():
+            self.widgets['tree_historial'].delete(item)
+        
+        try:
+            sesiones = self.db.obtener_sesiones_por_persona(self.persona_seleccionada['person_id'])
             
             for sesion in sesiones:
                 fecha = sesion.fecha.strftime('%d/%m/%Y %H:%M')
                 tasa = f"{sesion.tasa_exito * 100:.0f}%"
                 
-                # Color según tasa de éxito
-                tag = ''
-                if sesion.tasa_exito >= 0.8:
-                    tag = 'exito'
-                elif sesion.tasa_exito >= 0.5:
-                    tag = 'medio'
-                else:
-                    tag = 'bajo'
+                tag = 'exito' if sesion.tasa_exito >= 0.8 else 'medio' if sesion.tasa_exito >= 0.5 else 'bajo'
                 
-                self.tree_historial.insert(
+                self.widgets['tree_historial'].insert(
                     '',
                     'end',
-                    values=(
-                        fecha,
-                        sesion.nivel.name,
-                        sesion.ejercicios_correctos,
-                        sesion.ejercicios_fallidos,
-                        tasa
-                    ),
+                    values=(fecha, sesion.nivel.name, sesion.ejercicios_correctos, sesion.ejercicios_fallidos, tasa),
                     tags=(tag,)
                 )
             
-            # Configurar colores
-            self.tree_historial.tag_configure('exito', background='#d4edda')
-            self.tree_historial.tag_configure('medio', background='#fff3cd')
-            self.tree_historial.tag_configure('bajo', background='#f8d7da')
+            # Colores
+            self.widgets['tree_historial'].tag_configure('exito', background='#d4edda')
+            self.widgets['tree_historial'].tag_configure('medio', background='#fff3cd')
+            self.widgets['tree_historial'].tag_configure('bajo', background='#f8d7da')
             
         except Exception as e:
             print(f"❌ Error al cargar historial: {e}")
     
-    def _cargar_grafico_progreso(self, person_id: int):
-        """Cargar gráfico de progreso del usuario"""
-        # Limpiar frame
-        for widget in self.frame_grafico.winfo_children():
-            widget.destroy()
-        
-        try:
-            sesiones = self.db.obtener_sesiones_por_persona(person_id)
-            
-            if not sesiones:
-                label = tk.Label(
-                    self.frame_grafico,
-                    text="Sin sesiones registradas",
-                    font=('Arial', 12),
-                    bg='white',
-                    fg='#999'
-                )
-                label.pack(expand=True)
-                return
-            
-            # Preparar datos
-            fechas = [s.fecha.strftime('%d/%m') for s in sesiones[-10:]]
-            tasas = [s.tasa_exito * 100 for s in sesiones[-10:]]
-            
-            # Crear figura
-            fig = Figure(figsize=(4, 4), dpi=80)
-            ax = fig.add_subplot(111)
-            
-            # Gráfico de línea
-            ax.plot(fechas, tasas, marker='o', linewidth=2, markersize=8, color=self.color_secundario)
-            ax.axhline(y=80, color=self.color_exito, linestyle='--', label='Umbral subida nivel (80%)')
-            ax.axhline(y=70, color=self.color_advertencia, linestyle='--', label='Umbral éxito (70%)')
-            
-            ax.set_xlabel('Fecha', fontsize=11)
-            ax.set_ylabel('Tasa de Éxito (%)', fontsize=11)
-            ax.set_title('Evolución del Desempeño', fontsize=12, fontweight='bold')
-            ax.grid(True, alpha=0.3)
-            ax.legend(fontsize=9)
-            ax.set_ylim(0, 105)
-            
-            # Rotar etiquetas del eje x
-            plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
-            
-            fig.tight_layout()
-            
-            # Agregar a tkinter
-            canvas = FigureCanvasTkAgg(fig, self.frame_grafico)
-            canvas.draw()
-            canvas.get_tk_widget().pack(fill='both', expand=True)
-            
-            # Actualizar estadísticas
-            self._actualizar_estadisticas(sesiones)
-            
-        except Exception as e:
-            print(f"❌ Error al crear gráfico: {e}")
-            import traceback
-            traceback.print_exc()
-    
-    def _actualizar_estadisticas(self, sesiones: List):
-        """Actualizar estadísticas rápidas"""
-        # Limpiar frame
-        for widget in self.frame_stats.winfo_children():
-            widget.destroy()
-        
-        if not sesiones:
-            return
-        
-        # Calcular estadísticas
-        total_sesiones = len(sesiones)
-        ultima_sesion = sesiones[-1]
-        promedio_exito = sum(s.tasa_exito for s in sesiones) / total_sesiones * 100
-        
-        # Crear cards de estadísticas
-        stats = [
-            ("Total Sesiones", str(total_sesiones), self.color_secundario),
-            ("Última Tasa", f"{ultima_sesion.tasa_exito * 100:.0f}%", self.color_exito),
-            ("Promedio", f"{promedio_exito:.1f}%", self.color_advertencia)
-        ]
-        
-        for titulo, valor, color in stats:
-            card = tk.Frame(self.frame_stats, bg=color, relief='raised', bd=2)
-            card.pack(side='left', fill='both', expand=True, padx=5)
-            
-            tk.Label(
-                card,
-                text=titulo,
-                font=('Arial', 10),
-                bg=color,
-                fg='white'
-            ).pack(pady=(5, 0))
-            
-            tk.Label(
-                card,
-                text=valor,
-                font=('Arial', 16, 'bold'),
-                bg=color,
-                fg='white'
-            ).pack(pady=(0, 5))
-    
-    def _cargar_observaciones(self, person_id: int):
-        """Cargar observaciones del terapeuta"""
-        try:
-            # SIEMPRE limpiar el campo primero
-            self.text_observaciones.delete("1.0", "end")
-            
-            # Obtener observaciones
-            observaciones = self.db.obtener_observaciones_persona(person_id)
-            
-            # Si hay observaciones, cargar la más reciente
-            if observaciones:
-                obs_reciente = observaciones[0]
-                self.text_observaciones.insert("1.0", obs_reciente['observacion'])
-            # Si NO hay observaciones, el campo quedará vacío (correcto)
-            
-        except Exception as e:
-            print(f"⚠️ Error al cargar observaciones: {e}")
-            # En caso de error, también limpiar
-            self.text_observaciones.delete("1.0", "end")
-            
-    # ===== FUNCIONES DE MODIFICACIÓN =====
+    # ========== FUNCIONES DE MODIFICACIÓN ==========
     
     def cambiar_nivel(self):
-        """Aplicar cambio de nivel seleccionado"""
+        """Aplicar cambio de nivel"""
         if not self.persona_seleccionada:
             messagebox.showwarning("Advertencia", "No hay paciente seleccionado")
             return
         
-        nuevo_nivel_nombre = self.combo_nivel.get()
+        nuevo_nivel_nombre = self.widgets['combo_nivel'].get()
         
         if not nuevo_nivel_nombre:
             messagebox.showwarning("Advertencia", "Selecciona un nivel")
             return
         
-        # Confirmar
         respuesta = messagebox.askyesno(
             "Confirmar cambio",
             f"¿Cambiar el nivel de {self.persona_seleccionada['name']}\n"
@@ -931,7 +1105,6 @@ class PanelTerapeuta:
             return
         
         try:
-            # Obtener NivelTerapia
             nuevo_nivel = None
             for nivel in NivelTerapia:
                 if nivel.name == nuevo_nivel_nombre:
@@ -941,181 +1114,17 @@ class PanelTerapeuta:
             if not nuevo_nivel:
                 raise ValueError("Nivel no válido")
             
-            # Actualizar en BD
-            self.db.actualizar_nivel_persona(
-                self.persona_seleccionada['person_id'],
-                nuevo_nivel
-            )
+            self.db.actualizar_nivel_persona(self.persona_seleccionada['person_id'], nuevo_nivel)
             
-            # Actualizar interfaz
-            self.label_nivel.config(text=nuevo_nivel_nombre)
+            self.widgets['label_nivel'].config(text=nuevo_nivel_nombre)
             self.persona_seleccionada['nivel_nombre'] = nuevo_nivel_nombre
             
-            # Recargar lista
             self.cargar_usuarios()
             
-            messagebox.showinfo(
-                "Éxito",
-                f"Nivel actualizado a {nuevo_nivel_nombre}"
-            )
-            
-            print(f"✅ Nivel cambiado a {nuevo_nivel_nombre} para {self.persona_seleccionada['name']}")
+            messagebox.showinfo("Éxito", f"Nivel actualizado a {nuevo_nivel_nombre}")
             
         except Exception as e:
-            print(f"❌ Error al cambiar nivel: {e}")
             messagebox.showerror("Error", f"No se pudo cambiar el nivel:\n{e}")
-    
-    def subir_nivel(self):
-        """Subir un nivel al usuario"""
-        if not self.persona_seleccionada:
-            messagebox.showwarning("Advertencia", "No hay paciente seleccionado")
-            return
-        
-        try:
-            nivel_actual = None
-            for nivel in NivelTerapia:
-                if nivel.name == self.persona_seleccionada['nivel_nombre']:
-                    nivel_actual = nivel
-                    break
-            
-            if not nivel_actual:
-                raise ValueError("Nivel actual no válido")
-            
-            niveles = list(NivelTerapia)
-            indice_actual = niveles.index(nivel_actual)
-            
-            if indice_actual >= len(niveles) - 1:
-                messagebox.showinfo("Info", "El paciente ya está en el nivel máximo")
-                return
-            
-            nuevo_nivel = niveles[indice_actual + 1]
-            
-            # Actualizar
-            self.db.actualizar_nivel_persona(
-                self.persona_seleccionada['person_id'],
-                nuevo_nivel
-            )
-            
-            # Actualizar interfaz
-            self.label_nivel.config(text=nuevo_nivel.name)
-            self.combo_nivel.set(nuevo_nivel.name)
-            self.persona_seleccionada['nivel_nombre'] = nuevo_nivel.name
-            
-            # Recargar lista
-            self.cargar_usuarios()
-            
-            messagebox.showinfo(
-                "Éxito",
-                f"¡Nivel subido a {nuevo_nivel.name}!"
-            )
-            
-            print(f"✅ Nivel subido a {nuevo_nivel.name}")
-            
-        except Exception as e:
-            print(f"❌ Error al subir nivel: {e}")
-            messagebox.showerror("Error", f"No se pudo subir el nivel:\n{e}")
-    
-    def bajar_nivel(self):
-        """Bajar un nivel al usuario"""
-        if not self.persona_seleccionada:
-            messagebox.showwarning("Advertencia", "No hay paciente seleccionado")
-            return
-        
-        try:
-            nivel_actual = None
-            for nivel in NivelTerapia:
-                if nivel.name == self.persona_seleccionada['nivel_nombre']:
-                    nivel_actual = nivel
-                    break
-            
-            if not nivel_actual:
-                raise ValueError("Nivel actual no válido")
-            
-            niveles = list(NivelTerapia)
-            indice_actual = niveles.index(nivel_actual)
-            
-            if indice_actual <= 0:
-                messagebox.showinfo("Info", "El paciente ya está en el nivel mínimo")
-                return
-            
-            nuevo_nivel = niveles[indice_actual - 1]
-            
-            # Confirmar
-            respuesta = messagebox.askyesno(
-                "Confirmar",
-                f"¿Bajar el nivel a {nuevo_nivel.name}?"
-            )
-            
-            if not respuesta:
-                return
-            
-            # Actualizar
-            self.db.actualizar_nivel_persona(
-                self.persona_seleccionada['person_id'],
-                nuevo_nivel
-            )
-            
-            # Actualizar interfaz
-            self.label_nivel.config(text=nuevo_nivel.name)
-            self.combo_nivel.set(nuevo_nivel.name)
-            self.persona_seleccionada['nivel_nombre'] = nuevo_nivel.name
-            
-            # Recargar lista
-            self.cargar_usuarios()
-            
-            messagebox.showinfo(
-                "Éxito",
-                f"Nivel bajado a {nuevo_nivel.name}"
-            )
-            
-            print(f"✅ Nivel bajado a {nuevo_nivel.name}")
-            
-        except Exception as e:
-            print(f"❌ Error al bajar nivel: {e}")
-            messagebox.showerror("Error", f"No se pudo bajar el nivel:\n{e}")
-    
-    def reiniciar_nivel(self):
-        """Reiniciar al nivel INICIAL"""
-        if not self.persona_seleccionada:
-            messagebox.showwarning("Advertencia", "No hay paciente seleccionado")
-            return
-        
-        # Confirmar
-        respuesta = messagebox.askyesno(
-            "⚠️ Confirmar Reinicio",
-            f"¿REINICIAR el nivel de {self.persona_seleccionada['name']} a INICIAL?\n\n"
-            "Esta acción moverá al paciente al nivel más básico.",
-            icon='warning'
-        )
-        
-        if not respuesta:
-            return
-        
-        try:
-            # Actualizar a INICIAL
-            self.db.actualizar_nivel_persona(
-                self.persona_seleccionada['person_id'],
-                NivelTerapia.INICIAL
-            )
-            
-            # Actualizar interfaz
-            self.label_nivel.config(text='INICIAL')
-            self.combo_nivel.set('INICIAL')
-            self.persona_seleccionada['nivel_nombre'] = 'INICIAL'
-            
-            # Recargar lista
-            self.cargar_usuarios()
-            
-            messagebox.showinfo(
-                "Éxito",
-                "Nivel reiniciado a INICIAL"
-            )
-            
-            print(f"✅ Nivel reiniciado a INICIAL")
-            
-        except Exception as e:
-            print(f"❌ Error al reiniciar nivel: {e}")
-            messagebox.showerror("Error", f"No se pudo reiniciar el nivel:\n{e}")
     
     def guardar_observaciones(self):
         """Guardar observaciones del terapeuta"""
@@ -1123,14 +1132,13 @@ class PanelTerapeuta:
             messagebox.showwarning("Advertencia", "No hay paciente seleccionado")
             return
         
-        observaciones = self.text_observaciones.get("1.0", "end-1c").strip()
+        observaciones = self.widgets['text_observaciones'].get("1.0", "end-1c").strip()
         
         if not observaciones:
             messagebox.showwarning("Advertencia", "No hay observaciones para guardar")
             return
         
         try:
-            # Guardar en tabla de observaciones
             obs_id = self.db.crear_observacion(
                 person_id=self.persona_seleccionada['person_id'],
                 observacion=observaciones,
@@ -1138,23 +1146,15 @@ class PanelTerapeuta:
             )
             
             if obs_id:
-                messagebox.showinfo(
-                    "Éxito",
-                    "Observaciones guardadas correctamente"
-                )
-                
-                print(f"✅ Observaciones guardadas para {self.persona_seleccionada['name']}")
-                print(f"📝 {observaciones}")
+                messagebox.showinfo("Éxito", "Observaciones guardadas correctamente")
             else:
                 raise Exception("No se pudo guardar")
             
         except Exception as e:
-            print(f"❌ Error al guardar observaciones: {e}")
             messagebox.showerror("Error", f"No se pudieron guardar las observaciones:\n{e}")
     
     def abrir_ventana_edicion(self):
-        """Abrir ventana modal para editar información del paciente"""
-        
+        """Abrir ventana modal para editar información"""
         if not self.persona_seleccionada:
             messagebox.showwarning("Advertencia", "No hay paciente seleccionado")
             return
@@ -1162,47 +1162,44 @@ class PanelTerapeuta:
         # Crear ventana modal
         ventana_modal = tk.Toplevel(self.ventana)
         ventana_modal.title(f"Editar Información - {self.persona_seleccionada['name']}")
-        ventana_modal.geometry("600x550")
-        ventana_modal.configure(bg='white')
+        ventana_modal.geometry("500x450")
+        ventana_modal.configure(bg=self.colores['bg_card'])
         
-        # Centrar en pantalla
+        # Centrar
         ventana_modal.update_idletasks()
-        width = ventana_modal.winfo_width()
-        height = ventana_modal.winfo_height()
+        width = 500
+        height = 450
         x = (ventana_modal.winfo_screenwidth() // 2) - (width // 2)
         y = (ventana_modal.winfo_screenheight() // 2) - (height // 2)
         ventana_modal.geometry(f'{width}x{height}+{x}+{y}')
         
-        # Hacer modal
         ventana_modal.transient(self.ventana)
         ventana_modal.grab_set()
-        ventana_modal.focus_set()
         
         # Header
-        frame_header = tk.Frame(ventana_modal, bg=self.color_primario, height=80)
+        frame_header = tk.Frame(ventana_modal, bg=self.colores['primary'], height=60)
         frame_header.pack(fill='x')
         frame_header.pack_propagate(False)
         
         tk.Label(
             frame_header,
-            text="✏️ Editar Información del Paciente",
-            font=('Arial', 18, 'bold'),
-            bg=self.color_primario,
-            fg='white'
-        ).pack(pady=25)
+            text="✏️ Editar Información",
+            font=('Segoe UI', 16, 'bold'),
+            bg=self.colores['primary'],
+            fg=self.colores['text_white']
+        ).pack(pady=15)
         
-        # Frame de contenido
-        frame_contenido = tk.Frame(ventana_modal, bg='white')
+        # Contenido
+        frame_contenido = tk.Frame(ventana_modal, bg=self.colores['bg_card'])
         frame_contenido.pack(fill='both', expand=True, padx=30, pady=20)
         
-        # Variables para los campos
+        # Variables
         var_nombre = tk.StringVar(value=self.persona_seleccionada['name'])
         var_apellido = tk.StringVar(value=self.persona_seleccionada.get('apellido', '') or '')
         var_dni = tk.StringVar(value=self.persona_seleccionada.get('dni', '') or '')
         var_edad = tk.IntVar(value=self.persona_seleccionada['age'])
         var_sexo = tk.StringVar()
         
-        # Configurar sexo
         sexo_actual = self.persona_seleccionada.get('sex', '')
         if sexo_actual == 'M':
             var_sexo.set('Masculino')
@@ -1211,146 +1208,70 @@ class PanelTerapeuta:
         else:
             var_sexo.set('No especificado')
         
-        # Campo: Nombre
-        tk.Label(
-            frame_contenido,
-            text="Nombre:",
-            font=('Arial', 11, 'bold'),
-            bg='white',
-            fg=self.color_primario
-        ).grid(row=0, column=0, sticky='w', pady=10)
+        # Función helper para crear campo
+        def crear_campo(label_text, variable, row, tipo='entry'):
+            tk.Label(
+                frame_contenido,
+                text=label_text,
+                font=('Segoe UI', 10, 'bold'),
+                bg=self.colores['bg_card'],
+                fg=self.colores['text_dark']
+            ).grid(row=row, column=0, sticky='w', pady=8)
+            
+            if tipo == 'entry':
+                widget = tk.Entry(
+                    frame_contenido,
+                    textvariable=variable,
+                    font=('Segoe UI', 10),
+                    width=30,
+                    relief='solid',
+                    bd=1
+                )
+            elif tipo == 'spinbox':
+                widget = tk.Spinbox(
+                    frame_contenido,
+                    from_=1,
+                    to=100,
+                    textvariable=variable,
+                    font=('Segoe UI', 10),
+                    width=10,
+                    relief='solid',
+                    bd=1
+                )
+            elif tipo == 'combobox':
+                widget = ttk.Combobox(
+                    frame_contenido,
+                    textvariable=variable,
+                    values=['Masculino', 'Femenino', 'No especificado'],
+                    state='readonly',
+                    font=('Segoe UI', 10),
+                    width=27
+                )
+            
+            widget.grid(row=row, column=1, pady=8, sticky='ew')
+            return widget
         
-        entry_nombre = tk.Entry(
-            frame_contenido,
-            textvariable=var_nombre,
-            font=('Arial', 11),
-            width=35,
-            relief='solid',
-            bd=1
-        )
-        entry_nombre.grid(row=0, column=1, pady=10, sticky='ew')
+        crear_campo("Nombre:", var_nombre, 0)
+        crear_campo("Apellido:", var_apellido, 1)
+        crear_campo("DNI:", var_dni, 2)
+        crear_campo("Edad:", var_edad, 3, tipo='spinbox')
+        crear_campo("Sexo:", var_sexo, 4, tipo='combobox')
         
-        # Campo: Apellido
-        tk.Label(
-            frame_contenido,
-            text="Apellido:",
-            font=('Arial', 11, 'bold'),
-            bg='white',
-            fg=self.color_primario
-        ).grid(row=1, column=0, sticky='w', pady=10)
-        
-        entry_apellido = tk.Entry(
-            frame_contenido,
-            textvariable=var_apellido,
-            font=('Arial', 11),
-            width=35,
-            relief='solid',
-            bd=1
-        )
-        entry_apellido.grid(row=1, column=1, pady=10, sticky='ew')
-        
-        # Campo: DNI
-        tk.Label(
-            frame_contenido,
-            text="DNI:",
-            font=('Arial', 11, 'bold'),
-            bg='white',
-            fg=self.color_primario
-        ).grid(row=2, column=0, sticky='w', pady=10)
-        
-        entry_dni = tk.Entry(
-            frame_contenido,
-            textvariable=var_dni,
-            font=('Arial', 11),
-            width=35,
-            relief='solid',
-            bd=1
-        )
-        entry_dni.grid(row=2, column=1, pady=10, sticky='ew')
-        
-        # Ayuda para DNI
-        tk.Label(
-            frame_contenido,
-            text="(8-11 dígitos, opcional)",
-            font=('Arial', 9),
-            bg='white',
-            fg='#666'
-        ).grid(row=3, column=1, sticky='w')
-        
-        # Campo: Edad
-        tk.Label(
-            frame_contenido,
-            text="Edad:",
-            font=('Arial', 11, 'bold'),
-            bg='white',
-            fg=self.color_primario
-        ).grid(row=4, column=0, sticky='w', pady=10)
-        
-        spinbox_edad = tk.Spinbox(
-            frame_contenido,
-            from_=1,
-            to=100,
-            textvariable=var_edad,
-            font=('Arial', 11),
-            width=10,
-            relief='solid',
-            bd=1
-        )
-        spinbox_edad.grid(row=4, column=1, pady=10, sticky='w')
-        
-        # Campo: Sexo
-        tk.Label(
-            frame_contenido,
-            text="Sexo:",
-            font=('Arial', 11, 'bold'),
-            bg='white',
-            fg=self.color_primario
-        ).grid(row=5, column=0, sticky='w', pady=10)
-        
-        combo_sexo = ttk.Combobox(
-            frame_contenido,
-            textvariable=var_sexo,
-            values=['Masculino', 'Femenino', 'No especificado'],
-            state='readonly',
-            font=('Arial', 11),
-            width=20
-        )
-        combo_sexo.grid(row=5, column=1, pady=10, sticky='w')
-        
-        # Configurar expansión de columna
         frame_contenido.columnconfigure(1, weight=1)
         
-        # Frame de botones
-        frame_botones = tk.Frame(ventana_modal, bg='white')
+        # Botones
+        frame_botones = tk.Frame(ventana_modal, bg=self.colores['bg_card'])
         frame_botones.pack(fill='x', padx=30, pady=20)
         
-        # Función de guardado
         def guardar_cambios():
-            # Obtener valores
             nombre = var_nombre.get().strip()
             apellido = var_apellido.get().strip()
             dni = var_dni.get().strip()
             edad = var_edad.get()
             sexo_texto = var_sexo.get()
             
-            # Convertir sexo
-            if sexo_texto == 'Masculino':
-                sexo = 'M'
-            elif sexo_texto == 'Femenino':
-                sexo = 'F'
-            else:
-                sexo = None
+            sexo = 'M' if sexo_texto == 'Masculino' else 'F' if sexo_texto == 'Femenino' else None
             
-            # Validar
-            es_valido, mensaje_error = self.validar_datos_edicion(
-                nombre, apellido, dni, edad, sexo
-            )
-            
-            if not es_valido:
-                messagebox.showerror("Error de Validación", mensaje_error)
-                return
-            
-            # Actualizar en BD
             exito = self.db.actualizar_datos_persona(
                 person_id=self.persona_seleccionada['person_id'],
                 name=nombre,
@@ -1361,98 +1282,65 @@ class PanelTerapeuta:
             )
             
             if exito:
-                messagebox.showinfo("Éxito", "Información actualizada correctamente")
-                
-                # Actualizar persona seleccionada
-                self.persona_seleccionada['name'] = nombre
-                self.persona_seleccionada['apellido'] = apellido
-                self.persona_seleccionada['dni'] = dni
-                self.persona_seleccionada['age'] = edad
-                self.persona_seleccionada['sex'] = sexo
-                
-                # Cerrar modal
+                messagebox.showinfo("Éxito", "Información actualizada")
                 ventana_modal.destroy()
-                
-                # Recargar interfaz
                 self.cargar_detalles_usuario(self.persona_seleccionada['person_id'])
                 self.cargar_usuarios()
-                
             else:
-                messagebox.showerror("Error", "No se pudo actualizar la información")
+                messagebox.showerror("Error", "No se pudo actualizar")
         
-        # Botón Guardar
         btn_guardar = tk.Button(
             frame_botones,
-            text="✅ Guardar Cambios",
-            font=('Arial', 12, 'bold'),
-            bg=self.color_exito,
-            fg='white',
+            text="✅ Guardar",
+            font=('Segoe UI', 11, 'bold'),
+            bg=self.colores['success'],
+            fg=self.colores['text_white'],
             relief='flat',
-            padx=30,
-            pady=12,
+            bd=0,
+            padx=25,
+            pady=10,
             cursor='hand2',
             command=guardar_cambios
         )
-        btn_guardar.pack(side='left', padx=10)
+        btn_guardar.pack(side='left', padx=5)
         
-        # Botón Cancelar
         btn_cancelar = tk.Button(
             frame_botones,
             text="❌ Cancelar",
-            font=('Arial', 12),
-            bg='#95a5a6',
-            fg='white',
+            font=('Segoe UI', 11),
+            bg=self.colores['text_medium'],
+            fg=self.colores['text_white'],
             relief='flat',
-            padx=30,
-            pady=12,
+            bd=0,
+            padx=25,
+            pady=10,
             cursor='hand2',
             command=ventana_modal.destroy
         )
-        btn_cancelar.pack(side='left', padx=10)
-    
-    def validar_datos_edicion(self, nombre, apellido, dni, edad, sexo):
-        """
-        Validar datos antes de guardar
-        
-        Returns:
-            (es_valido, mensaje_error)
-        """
-        # Validar nombre
-        if not nombre or len(nombre) < 2:
-            return False, "El nombre debe tener al menos 2 caracteres"
-        
-        # Validar DNI (opcional pero si se proporciona debe ser válido)
-        if dni:
-            # Solo dígitos
-            if not dni.isdigit():
-                return False, "El DNI debe contener solo números"
-            
-            # Longitud 8-11
-            if len(dni) < 8 or len(dni) > 11:
-                return False, "El DNI debe tener entre 8 y 11 dígitos"
-        
-        # Validar edad
-        if edad < 1 or edad > 100:
-            return False, "La edad debe estar entre 1 y 100 años"
-        
-        # Validar sexo
-        if sexo and sexo not in ['M', 'F']:
-            return False, "Sexo inválido"
-        
-        return True, ""
+        btn_cancelar.pack(side='left', padx=5)
     
     def cerrar(self):
         """Cerrar el panel"""
         print("\n🚪 Cerrando panel de administrador...")
         self.modo_admin_activo = False
         
+        # ✅ Esperar que el hilo termine limpiamente
+        if hasattr(self, 'hilo_escucha_admin') and self.hilo_escucha_admin.is_alive():
+            print("⏳ Esperando que el hilo de audio se libere...")
+            self.hilo_escucha_admin.join(timeout=6)
+            
+            if self.hilo_escucha_admin.is_alive():
+                print("⚠️ El hilo tardó más de lo esperado")
+            else:
+                print("✅ Hilo de audio liberado correctamente")
+                
         if self.ventana:
             try:
                 self.ventana.destroy()
             except:
                 pass
         
-        print("✅ Panel cerrado. Robot vuelve a modo normal.\n")
+        print("✅ Panel cerrado.\n")
     
     def mostrar(self):
         """Mostrar la ventana del panel"""

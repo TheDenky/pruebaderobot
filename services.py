@@ -263,7 +263,7 @@ class RobotServiceInterfazUnificada:
         
         # Obtener TODOS los ejercicios de TODOS los niveles
         print("🔍 Obteniendo ejercicios de todos los niveles para el test...")
-        todos_ejercicios = self.db.obtener_todos_ejercicios()
+        ejercicios_disponibles = self.db.obtener_todos_ejercicios()
 
         # Verificar que hay al menos 6 ejercicios
         if len(ejercicios_disponibles) < 6:

@@ -179,28 +179,72 @@ class AudioSystemConInterfaz:
     
     # ========== RECONOCIMIENTO DE VOZ ==========
     
-    def escuchar(self, timeout: int = 10, phrase_time_limit: int = 10) -> Optional[str]:
-        """Escucha y retorna texto reconocido"""
-        try:
-            with sr.Microphone() as source:
-                self.recognizer.adjust_for_ambient_noise(source, duration=0.3)
-                audio = self.recognizer.listen(
-                    source,
-                    timeout=timeout,
-                    phrase_time_limit=phrase_time_limit
-                )
-                texto = self.recognizer.recognize_google(audio, language=Config.SPEECH_LANGUAGE)
-                return texto
-        except sr.WaitTimeoutError:
-            return None
-        except sr.UnknownValueError:
-            return None
-        except sr.RequestError as e:
-            print(f"❌ Error de reconocimiento: {e}")
-            return None
-        except Exception as e:
-            print(f"⚠️ Error: {e}")
-            return None
+    def escuchar(self, timeout: int = 5, phrase_time_limit: int = 5) -> Optional[str]:
+        """Escucha y retorna texto reconocido.
+        
+        Usa un hilo separado para recognize_google() con timeout de 8 segundos,
+        evitando que un hang de red paralice el sistema indefinidamente.
+        """
+        intentos = 0
+        max_intentos = 3
+
+        while intentos < max_intentos:
+            try:
+                # 1. Capturar audio del micrófono
+                with sr.Microphone() as source:
+                    self.recognizer.adjust_for_ambient_noise(source, duration=0.1)
+                    audio = self.recognizer.listen(
+                        source,
+                        timeout=timeout,
+                        phrase_time_limit=phrase_time_limit
+                    )
+
+                # 2. Enviar a Google en hilo separado con timeout
+                resultado = [None]
+                error = [None]
+
+                def reconocer():
+                    try:
+                        resultado[0] = self.recognizer.recognize_google(
+                            audio,
+                            language=Config.SPEECH_LANGUAGE
+                        )
+                    except Exception as e:
+                        error[0] = e
+
+                hilo = threading.Thread(target=reconocer, daemon=True)
+                hilo.start()
+                hilo.join(timeout=5)
+
+                # 3. Verificar si Google respondió a tiempo
+                if hilo.is_alive():
+                    print("⚠️ Servicio de voz sin respuesta, continuando...")
+                    return None
+
+                # 4. Propagar error si ocurrió dentro del hilo
+                if error[0] is not None:
+                    raise error[0]
+
+                return resultado[0]
+
+            except sr.WaitTimeoutError:
+                return None
+
+            except sr.UnknownValueError:
+                return None
+
+            except sr.RequestError:
+                intentos += 1
+                if intentos < max_intentos:
+                    print(f"⚠️ Sin conexión al servicio de voz (intento {intentos}/{max_intentos}), reintentando...")
+                    time.sleep(0.3)
+                else:
+                    print("⚠️ Servicio de voz no disponible, continuando...")
+                return None
+
+            except Exception as e:
+                print(f"⚠️ Error: {e}")
+                return None
     
     # ========== SÍNTESIS DE VOZ CON NOTIFICACIÓN ==========
     
@@ -303,19 +347,41 @@ class AudioSystemConInterfaz:
         try:
             with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as temp_file:
                 temp_filename = temp_file.name
-            
-            tts = self.gTTS(text=texto, lang='es', slow=False)
-            tts.save(temp_filename)
-            
-            subprocess.run(['mpg123', '-q', temp_filename], check=True)
-            
+
+            # ✅ gTTS en hilo separado con timeout de 10 segundos
+            # Evita que un hang de red congele el sistema
+            error_gtts = [None]
+            exito_gtts = [False]
+
+            def generar_audio():
+                try:
+                    tts = self.gTTS(text=texto, lang='es', slow=False)
+                    tts.save(temp_filename)
+                    exito_gtts[0] = True
+                except Exception as e:
+                    error_gtts[0] = e
+
+            hilo = threading.Thread(target=generar_audio, daemon=True)
+            hilo.start()
+            hilo.join(timeout=10)
+
+            if hilo.is_alive():
+                print("⚠️ gTTS sin respuesta, omitiendo audio...")
+                return False
+
+            if not exito_gtts[0]:
+                print(f"⚠️ gTTS falló: {error_gtts[0]}")
+                return False
+
+            subprocess.run(['mpg123', '-q', temp_filename], check=True, timeout=20)
+
             try:
                 os.remove(temp_filename)
             except:
                 pass
-            
+
             return True
-            
+
         except Exception as e:
             print(f"⚠️ gTTS falló: {e}")
             return False
@@ -325,9 +391,12 @@ class AudioSystemConInterfaz:
         try:
             velocidad_espeak = int(Config.TTS_RATE * velocidad)
             comando = ['espeak', '-v', 'es', '-s', str(velocidad_espeak), texto]
-            subprocess.run(comando, check=True)
+            subprocess.run(comando, check=True, timeout=20)
             return True
             
+        except subprocess.TimeoutExpired:
+            print("⚠️ espeak tardó demasiado, omitiendo audio...")
+            return False
         except Exception as e:
             print(f"⚠️ espeak falló: {e}")
             return False
