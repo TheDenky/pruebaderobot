@@ -11,9 +11,9 @@ class ConfigReintentos:
     """Configuración del sistema de reintentos"""
     MAX_INTENTOS_AUDIO = 3  # Máximo de intentos cuando no se escucha nada
     MAX_INTENTOS_VALIDACION = 3  # Máximo de intentos cuando respuesta no es válida
-    TIMEOUT_ESCUCHA = 10  # Segundos para escuchar
-    PHRASE_LIMIT = 10  # Límite de frase en segundos
-    PAUSA_ENTRE_INTENTOS = 0.5  # Segundos de pausa entre intentos
+    TIMEOUT_ESCUCHA = 8  # Segundos para escuchar
+    PHRASE_LIMIT = 6  # Límite de frase en segundos
+    PAUSA_ENTRE_INTENTOS = 0.2  # Segundos de pausa entre intentos
 
 
 def preguntar_con_reintentos(
@@ -88,7 +88,7 @@ def preguntar_con_reintentos(
                 if interfaz:
                     interfaz.robot_hablando(False)
                 
-                respuesta_final = audio_system.escuchar(timeout=10, phrase_time_limit=10)
+                respuesta_final = audio_system.escuchar(timeout=6, phrase_time_limit=5)
                 
                 if respuesta_final and detectar_salir(respuesta_final):
                     print("ℹ️ El niño decidió salir")
@@ -347,7 +347,7 @@ def evaluacion_ejercicio_con_ia(
                 if interfaz:
                     interfaz.robot_hablando(False)
                 
-                time.sleep(1)
+                time.sleep(0.3)
                 continue
             else:
                 # Último intento, asumir error
@@ -421,7 +421,7 @@ def manejar_frustracion(
         if interfaz:
             interfaz.robot_hablando(False)
         
-        respuesta = audio_system.escuchar(timeout=10, phrase_time_limit=10)
+        respuesta = audio_system.escuchar(timeout=6, phrase_time_limit=5)
         
         if respuesta:
             from chatopenai import detectar_salir, validar_si_no
@@ -442,6 +442,6 @@ def manejar_frustracion(
         if interfaz:
             interfaz.robot_hablando(False)
         
-        time.sleep(2)
+        time.sleep(0.5)
     
     return True

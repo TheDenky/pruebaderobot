@@ -63,12 +63,12 @@ class RobotDodoUnificado:
         
         # Mensaje inicial por voz (mostrará eyes.gif)
         
-#         descripcion = ("¡Hola amiguito! Soy DODO, un robot muy especial que va a ser tu amigo en esta aventura. Vamos a jugar juntos practicando palabras. Es muy fácil y divertido. Te voy a enseñar imágenes súper bonitas de animales, objetos y muchas cosas más. Tú solo tienes que decir qué es lo que ves. Cuando lo hagas bien, ganarás estrellas. Tengo cuatro niveles, desde el más fácil hasta el más difícil. Empezarás con cositas simples como las vocales A, E, I, O, U, y poco a poco iremos practicando palabras más grandes. Lo mejor es que voy a grabar tu voz para que puedas escuchar cómo vas mejorando cada día. Eso es súper emocionante. Cuando te sientas listo para empezar nuestra aventura de hoy, solo di la palabra mágica: hola robot.")
-#         presentacion = consultar("Haz una descripcion corta de lo que haces para niños")
-#         presentacion = "¡Hola! Soy el robot DODO. Ayudo a niños a hablar mejor. Juntos, aprendemos y nos divertimos. ¡Tú puedes!"
-#         self.audio.hablar(presentacion, velocidad=1)
+        descripcion = ("¡Hola amiguito! Soy DODO, un robot muy especial que va a ser tu amigo en esta aventura. Vamos a jugar juntos practicando palabras. Es muy fácil y divertido. Te voy a enseñar imágenes súper bonitas de animales, objetos y muchas cosas más. Tú solo tienes que decir qué es lo que ves. Cuando lo hagas bien, ganarás estrellas. Tengo cuatro niveles, desde el más fácil hasta el más difícil. Empezarás con cositas simples como las vocales A, E, I, O, U, y poco a poco iremos practicando palabras más grandes. Lo mejor es que voy a grabar tu voz para que puedas escuchar cómo vas mejorando cada día. Eso es súper emocionante. Cuando te sientas listo para empezar nuestra aventura de hoy, solo di la palabra mágica: hola robot.")
+        presentacion = consultar("Haz una descripcion corta de lo que haces para niños")
+        presentacion = "¡Hola! Soy el robot DODO. Ayudo a niños a hablar mejor. Juntos, aprendemos y nos divertimos. ¡Tú puedes!"
+        self.audio.hablar(presentacion, velocidad=1)
         
-#         respuesta = consultar("Di un saludo corto que no sea hola, luego indica que si te necesita solo te salude")
+        respuesta = consultar("Di un saludo corto que no sea hola, luego indica que si te necesita solo te salude")
         respuesta = "Si me necesitas, solo dime: hola robot. ¡Estoy aquí para ayudar!"
         self.audio.hablar(respuesta, velocidad=1)
         
@@ -251,7 +251,7 @@ class RobotDodoUnificado:
         # ========== GRABAR Y ESCUCHAR SIMULTÁNEAMENTE ==========
         print(f"🎙️ Grabando comentario inicial...")
         respuesta, audio_path = self.audio.grabar_y_escuchar(
-            duracion=10,  # 10 segundos para dar tiempo a responder
+            duracion=5,  # 10 segundos para dar tiempo a responder
             person_id=persona.person_id,
             exercise_id=0,  # 0 porque no es un ejercicio
             ejercicio_nombre="COMENTARIO_INICIAL",
@@ -287,14 +287,14 @@ class RobotDodoUnificado:
             
             # Dar la respuesta de ánimo
             self.audio.hablar(mensaje_animo)
-            time.sleep(1)
+            time.sleep(0.2)
         else:
             print("⚠️ No se escuchó respuesta")
             if audio_path:
                 print(f"⚠️ Audio grabado pero sin texto reconocido: {audio_path}")
             # Mensaje genérico si no responde
             self.audio.hablar("Está bien. Vamos a empezar entonces.")
-            time.sleep(0.5)
+            time.sleep(0.2)
         
         print()
     
@@ -319,7 +319,7 @@ class RobotDodoUnificado:
         # ========== GRABAR Y ESCUCHAR SIMULTÁNEAMENTE ==========
         print(f"🎙️ Grabando comentario final...")
         respuesta, audio_path = self.audio.grabar_y_escuchar(
-            duracion=10,  # 10 segundos para dar tiempo a responder
+            duracion=5,  # 10 segundos para dar tiempo a responder
             person_id=persona.person_id,
             exercise_id=0,  # 0 porque no es un ejercicio
             ejercicio_nombre="COMENTARIO_FINAL",
@@ -353,14 +353,14 @@ class RobotDodoUnificado:
             
             # Dar la respuesta
             self.audio.hablar(mensaje_respuesta)
-            time.sleep(1)
+            time.sleep(0.2)
         else:
             print("⚠️ No se escuchó respuesta")
             if audio_path:
                 print(f"⚠️ Audio grabado pero sin texto reconocido: {audio_path}")
             # Mensaje genérico si no responde
             self.audio.hablar("Está bien. Espero que hayas disfrutado la sesión.")
-            time.sleep(0.5)
+            time.sleep(0.2)
         
         print()
         

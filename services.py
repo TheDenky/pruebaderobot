@@ -28,7 +28,7 @@ class Config:
     """Configuración simplificada"""
     MIN_AGE = 1
     MAX_AGE = 18
-    RECORDING_DURATION = 5
+    RECORDING_DURATION = 4
     LEVEL_UP_THRESHOLD = 0.80
 
 
@@ -88,7 +88,7 @@ class RobotServiceInterfazUnificada:
         # Saludo personalizado
         saludo = consultar("Di un saludo corto para un niño nuevo que viene a terapia de habla")
         self.audio.hablar(saludo)
-        time.sleep(1)
+        time.sleep(0.1)
         
         # === NOMBRE ===
         nombre = pedir_nombre_con_reintentos(
@@ -105,11 +105,11 @@ class RobotServiceInterfazUnificada:
         # MOSTRAR EL NOMBRE EN LA INTERFAZ
         if self.interfaz:
             self.interfaz.mostrar_nombre(nombre)
-            time.sleep(3)
+            time.sleep(1.5)
         
         # Confirmar nombre
         self.audio.hablar(f"Mucho gusto, {nombre}.")
-        time.sleep(0.5)
+        time.sleep(0.1)
         
         # === APELLIDO ===
         def validador_apellido(respuesta: str):
@@ -141,7 +141,7 @@ class RobotServiceInterfazUnificada:
         # MOSTRAR NOMBRE COMPLETO
         if self.interfaz:
             self.interfaz.mostrar_nombre(nombre_completo)
-            time.sleep(4)
+            time.sleep(2)
         
         # === EDAD ===
         edad = pedir_edad_con_reintentos(
@@ -158,7 +158,7 @@ class RobotServiceInterfazUnificada:
         # MOSTRAR EDAD
         if self.interfaz:
             self.interfaz.mostrar_nombre(f"{edad} años")
-            time.sleep(2)
+            time.sleep(1)
         
         # === SEXO ===
         if self.interfaz:
@@ -222,21 +222,16 @@ class RobotServiceInterfazUnificada:
         sexo_texto = "niño" if sexo == 'M' else "niña" if sexo == 'F' else "persona"
         dni_texto_confirmacion = f", DNI {dni}" if dni else ""
         
-        confirmado = confirmar_con_usuario(
-            audio_system=self.audio,
-            mensaje_confirmacion=f"Tu nombre es {nombre_completo}, tienes {edad} años, eres {sexo_texto}{dni_texto_confirmacion}. ¿Es correcto?",
-            interfaz=None
-        )
-        
-        if not confirmado:
-            self.audio.hablar("Está bien. Podemos intentar de nuevo después.")
-            return None
+        apellido_texto = apellido if apellido else ""
+        self.audio.hablar(f"Tu nombre es {nombre} {apellido_texto} y tienes {edad} años.")
+        time.sleep(0.5)
         
         # === GUARDAR EN BASE DE DATOS ===
         self.audio.hablar("Perfecto. Guardando tus datos.")
         
         persona = Persona(
-            name=nombre_completo, 
+            name=nombre,
+            apellido=apellido,
             age=edad,
             dni=dni,
             sex=sexo
@@ -259,7 +254,7 @@ class RobotServiceInterfazUnificada:
         print("\n🎯 === TEST DIAGNÓSTICO ===")
         
         self.audio.hablar(f"Hola {persona.name}. Vamos a hacer un pequeño test.")
-        time.sleep(1)
+        time.sleep(0.1)
         
         # Obtener TODOS los ejercicios de TODOS los niveles
         print("🔍 Obteniendo ejercicios de todos los niveles para el test...")
@@ -297,7 +292,7 @@ class RobotServiceInterfazUnificada:
                     ruta_imagen=ruta_imagen
                 )
             
-            time.sleep(0.5)
+            time.sleep(0.3)
             
             # === GRABAR Y EVALUAR SIMULTÁNEAMENTE ===
             print(f"🎙️ Grabando audio del test: {ejercicio_actual.word}")
@@ -326,7 +321,7 @@ class RobotServiceInterfazUnificada:
                         ruta_imagen=ruta_imagen
                     )
                 
-                time.sleep(0.5)
+                time.sleep(0.3)
                 
                 # Segundo intento
                 respuesta, audio_path_2 = self.audio.grabar_y_escuchar(
@@ -388,7 +383,7 @@ class RobotServiceInterfazUnificada:
         self.audio.hablar(f"Muy bien. Tu nivel es: {nivel.name}")
         
         # Mensaje motivador del nivel
-        time.sleep(1)
+        time.sleep(0.5)
         mensaje_motivador = consultar(
             f"El niño {persona.name} está en el nivel {nivel.name}. "
             f"Explícale brevemente qué tipo de ejercicios hará en este nivel y motívalo a comenzar. "
@@ -398,7 +393,7 @@ class RobotServiceInterfazUnificada:
         
         print(f"💬 Mensaje motivador: {mensaje_motivador}")
         self.audio.hablar(mensaje_motivador)
-        time.sleep(1)
+        time.sleep(0.5)
         
         print(f"✅ Nivel asignado: {nivel.name}")
         print(f"🎙️ Audios del test grabados en: audio_registros/{persona.person_id}/\n")
@@ -407,46 +402,82 @@ class RobotServiceInterfazUnificada:
     # ========== RF3: RECONOCIMIENTO DE USUARIO ==========
     
     def buscar_usuario_existente(self) -> Optional[Persona]:
-        """RF3.1: Identificar al niño"""
+        """RF3.1: Identificar al niño por nombre y apellido"""
         print("\n🔍 === BÚSQUEDA DE USUARIO ===")
-        
+
+        # === NOMBRE ===
         nombre = pedir_nombre_con_reintentos(
             audio_system=self.audio,
             interfaz=None
         )
-        
+
         if not nombre:
             self.audio.hablar("No pude entender tu nombre.")
             return None
-        
-        print(f"🔍 Buscando: {nombre}")
-        
-        # MOSTRAR NOMBRE MIENTRAS BUSCA
+
+        print(f"🔍 Nombre: {nombre}")
+
         if self.interfaz:
             self.interfaz.mostrar_nombre(nombre)
-            time.sleep(1)
-        
-        # Buscar en base de datos
-        persona = self.db.buscar_persona_por_nombre(nombre)
-        
+
+        # === APELLIDO ===
+        def validador_apellido(respuesta: str):
+            es_valido, apellido = validar_apellido(respuesta)
+            return es_valido, apellido
+
+        exito, apellido = preguntar_con_reintentos(
+            audio_system=self.audio,
+            pregunta="¿Cuál es tu apellido?",
+            validador=validador_apellido,
+            mensajes_reintento=[
+                "No entendí tu apellido. ¿Cuál es?",
+                "Tu apellido, por favor.",
+                "Dime tu apellido una vez más."
+            ],
+            max_intentos=3,
+            permitir_salir=False,
+            interfaz=None
+        )
+
+        if not exito or not apellido:
+            apellido = None
+            print("⚠️ No se obtuvo apellido, buscando solo por nombre")
+
+        print(f"🔍 Buscando: {nombre} {apellido or ''}")
+
+        # === BÚSQUEDA ===
+        persona = None
+
+        # Búsqueda precisa: nombre + apellido
+        if apellido:
+            persona = self.db.buscar_persona_por_nombre_apellido(nombre, apellido)
+            if persona:
+                print(f"✅ Encontrado por nombre + apellido")
+
+        # Fallback: solo por nombre si no encontró con apellido
+        if not persona:
+            print("⚠️ No encontrado por nombre+apellido, buscando solo por nombre...")
+            persona = self.db.buscar_persona_por_nombre(nombre)
+            if persona:
+                print(f"✅ Encontrado solo por nombre")
+
+        # === RESULTADO ===
         if persona:
-            # Recuperar progreso
             ultima_sesion = self.db.obtener_ultima_sesion(persona.person_id)
             if ultima_sesion:
                 persona.nivel_actual = ultima_sesion.nivel
-            
-            # MOSTRAR NOMBRE COMPLETO
+
             if self.interfaz:
-                self.interfaz.mostrar_nombre(persona.name)
+                nombre_mostrar = f"{persona.name} {persona.apellido or ''}".strip()
+                self.interfaz.mostrar_nombre(nombre_mostrar)
                 time.sleep(2)
-            
-            # Saludo personalizado
+
             saludo = consultar(
                 f"Di un saludo corto de bienvenida para {persona.name}, un niño que regresa a terapia",
                 contexto=f"El niño está en nivel {persona.nivel_actual.name}"
             )
             self.audio.hablar(saludo)
-            
+
             print(f"✅ Usuario encontrado: {persona.name} - Nivel {persona.nivel_actual.name}\n")
             return persona
         else:
@@ -471,7 +502,7 @@ class RobotServiceInterfazUnificada:
             contexto="Debe ser entusiasta y positivo"
         )
         self.audio.hablar(intro)
-        time.sleep(1)
+        time.sleep(0.2)
         
         # Obtener ejercicios del nivel
         ejercicios = self.db.obtener_ejercicios_por_nivel(persona.nivel_actual)
@@ -522,7 +553,7 @@ class RobotServiceInterfazUnificada:
                 print("ℹ️ Usuario decidió terminar")
                 break
             
-            time.sleep(0.5)
+            time.sleep(0.2)
         
         # Volver a eyes.gif
         if self.interfaz:
@@ -561,7 +592,7 @@ class RobotServiceInterfazUnificada:
                 ruta_imagen=ruta_imagen
             )
         
-        time.sleep(0.5)
+        time.sleep(0.2)
         
         # === GRABAR Y EVALUAR SIMULTÁNEAMENTE ===
         inicio = time.time()
@@ -636,8 +667,11 @@ class RobotServiceInterfazUnificada:
                 self.interfaz.mostrar_feedback_ejercicio(correcto)
                 time.sleep(0.3)  # Breve pausa para ver el cambio de color
                 
+                if confianza > 0.7:
+                    self.interfaz.mostrar_celebracion(duracion_segundos=2)
+                
                 # 2. Mostrar GIF de celebración (2 segundos)
-                self.interfaz.mostrar_celebracion(duracion_segundos=2)
+                #self.interfaz.mostrar_celebracion(duracion_segundos=2)
             
             # 3. Dar feedback verbal MIENTRAS se muestra la celebración
             self.audio.hablar(feedback_ia)

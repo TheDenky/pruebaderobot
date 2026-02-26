@@ -33,15 +33,16 @@ class Database:
             cursor = self.conn.cursor()
             nivel_id = persona.nivel_actual.value
             cursor.execute('''
-                INSERT INTO person (name, age, dni, sex, diagnostic_level, actual_level, actual_therapy)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO person (name, apellido, age, dni, sex, diagnostic_level, actual_level, actual_therapy)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
-                persona.name, 
-                persona.age, 
+                persona.name,
+                persona.apellido,
+                persona.age,
                 persona.dni,
                 persona.sex,
-                nivel_id, 
-                nivel_id, 
+                nivel_id,
+                nivel_id,
                 1
             ))
             self.conn.commit()
@@ -62,6 +63,24 @@ class Database:
             ''', (f'%{nombre}%',))
             row = cursor.fetchone()
             
+            if row:
+                return self._row_to_persona(row)
+            return None
+        except Exception as e:
+            print(f"❌ Error al buscar persona: {e}")
+            return None
+    def buscar_persona_por_nombre_apellido(self, nombre: str, apellido: str) -> Optional[Persona]:
+        """Buscar persona por nombre Y apellido para búsqueda precisa"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                SELECT * FROM person
+                WHERE name LIKE ? AND apellido LIKE ?
+                ORDER BY register_date DESC
+                LIMIT 1
+            ''', (f'%{nombre}%', f'%{apellido}%'))
+            row = cursor.fetchone()
+
             if row:
                 return self._row_to_persona(row)
             return None

@@ -47,11 +47,14 @@ class AudioSystemConInterfaz:
         
         # Verificar sounddevice
         self.sounddevice_disponible = self._verificar_sounddevice()
+        self.input_device_index = self._detectar_dispositivo_entrada()
         
         # Inicializar TTS
         #self._inicializar_elevenlabs()
         self._inicializar_gtts_mpg123()
         self._verificar_sox()
+        
+        self.mic_lock = threading.Lock()
         
         if not self.elevenlabs_disponible:
             self._inicializar_gtts_mpg123()
@@ -81,6 +84,20 @@ class AudioSystemConInterfaz:
             print(f"⚠️ sounddevice no disponible: {e}")
             return False
     
+    def _detectar_dispositivo_entrada(self):
+        """Detecta el primer dispositivo de entrada disponible"""
+        try:
+            devices = sd.query_devices()
+            for i, device in enumerate(devices):
+                if device['max_input_channels'] > 0:
+                    print(f"✅ Dispositivo de entrada detectado: [{i}] {device['name']}")
+                    return i
+            print("⚠️ No se encontró ningún dispositivo de entrada")
+            return None
+        except Exception as e:
+            print(f"⚠️ Error detectando dispositivo de entrada: {e}")
+            return None
+        
     def _verificar_sox(self):
         """Verifica que sox esté disponible"""
         try:
@@ -191,14 +208,16 @@ class AudioSystemConInterfaz:
         while intentos < max_intentos:
             try:
                 # 1. Capturar audio del micrófono
-                with sr.Microphone() as source:
-                    self.recognizer.adjust_for_ambient_noise(source, duration=0.1)
-                    audio = self.recognizer.listen(
-                        source,
-                        timeout=timeout,
-                        phrase_time_limit=phrase_time_limit
-                    )
-
+                adquirido = self.mic_lock.acquire(timeout=8)
+                if not adquirido:
+                    print("⚠️ No se pudo adquirir el micrófono, está ocupado")
+                    return None
+                try:
+                    with sr.Microphone() as source:
+                        self.recognizer.adjust_for_ambient_noise(source, duration=0.1)
+                        audio = self.recognizer.listen(source, timeout=timeout, phrase_time_limit=phrase_time_limit)
+                finally:
+                    self.mic_lock.release()
                 # 2. Enviar a Google en hilo separado con timeout
                 resultado = [None]
                 error = [None]
@@ -237,7 +256,7 @@ class AudioSystemConInterfaz:
                 intentos += 1
                 if intentos < max_intentos:
                     print(f"⚠️ Sin conexión al servicio de voz (intento {intentos}/{max_intentos}), reintentando...")
-                    time.sleep(0.3)
+                    time.sleep(0.2)
                 else:
                     print("⚠️ Servicio de voz no disponible, continuando...")
                 return None
@@ -391,7 +410,7 @@ class AudioSystemConInterfaz:
         try:
             velocidad_espeak = int(Config.TTS_RATE * velocidad)
             comando = ['espeak', '-v', 'es', '-s', str(velocidad_espeak), texto]
-            subprocess.run(comando, check=True, timeout=20)
+            subprocess.run(comando, check=True, timeout=10)
             return True
             
         except subprocess.TimeoutExpired:
@@ -460,9 +479,9 @@ class AudioSystemConInterfaz:
                 int(duracion * sample_rate),
                 samplerate=sample_rate,
                 channels=channels,
-                dtype='int16'
+                dtype='int16',
+                device=self.input_device_index
             )
-            
             sd.wait()
             
             # Guardar archivo
@@ -478,44 +497,94 @@ class AudioSystemConInterfaz:
             return None
     
     def grabar_y_escuchar(self, duracion: int, person_id: int, exercise_id: int,
-                          ejercicio_nombre: str = None, nivel_actual: str = None,
-                          numero_sesion: int = None) -> tuple:
+                      ejercicio_nombre: str = None, nivel_actual: str = None,
+                      numero_sesion: int = None) -> tuple:
         """
-        Graba audio Y reconoce voz simultáneamente
+        Graba audio UNA sola vez y bifurca el resultado:
+        - Guarda el archivo .wav
+        - Transcribe usando el mismo audio sin abrir el micrófono de nuevo
         
         Returns:
             (texto_reconocido, audio_path)
         """
         texto_reconocido = None
         audio_path = None
-        
-        def escuchar_thread():
-            nonlocal texto_reconocido
+
+        try:
+            sample_rate = 44100
+
+            # 1. Único acceso al micrófono
+            print(f"🎙️ Grabando audio del test: {ejercicio_nombre}")
+            
+            if self.input_device_index is None:
+                print("❌ No hay dispositivo de entrada disponible, cancelando grabación")
+                return (None, None)
+                
+            adquirido = self.mic_lock.acquire(timeout=8)
+            print(f"🔒 Micrófono adquirido por: {threading.current_thread().name}")
+            if not adquirido:
+                print("⚠️ No se pudo adquirir el micrófono, está ocupado")
+                return (None, None)
             try:
-                texto_reconocido = self.escuchar(timeout=duracion, phrase_time_limit=duracion)
-            except:
-                pass
-        
-        def grabar_thread():
-            nonlocal audio_path
-            try:
-                audio_path = self.grabar(
-                    duracion, person_id, exercise_id,
-                    ejercicio_nombre, nivel_actual, numero_sesion
+                audio_data = sd.rec(
+                    int(duracion * sample_rate),
+                    samplerate=sample_rate,
+                    channels=1,
+                    dtype='int16',
+                    device=self.input_device_index
                 )
-            except:
-                pass
-        
-        hilo_escucha = threading.Thread(target=escuchar_thread)
-        hilo_grabacion = threading.Thread(target=grabar_thread)
-        
-        hilo_escucha.start()
-        hilo_grabacion.start()
-        
-        hilo_escucha.join()
-        hilo_grabacion.join()
-        
+                sd.wait()
+            finally:
+                self.mic_lock.release()
+
+            # 2. Guardar archivo .wav
+            carpeta_usuario = os.path.join(Config.AUDIO_FOLDER, str(person_id))
+            os.makedirs(carpeta_usuario, exist_ok=True)
+            fecha = datetime.now().strftime('%Y-%m-%d')
+
+            if ejercicio_nombre and nivel_actual and numero_sesion is not None:
+                nombre_limpio = ejercicio_nombre.replace(' ', '_').replace('/', '_')
+                nivel_limpio = nivel_actual.replace(' ', '_')
+                nombre_archivo = f"{nombre_limpio}_{nivel_limpio}_sesion{numero_sesion}_{fecha}.wav"
+            else:
+                timestamp = datetime.now().strftime('%H%M%S')
+                nombre_archivo = f"ejercicio_{exercise_id}_{fecha}_{timestamp}.wav"
+
+            audio_path = os.path.join(carpeta_usuario, nombre_archivo)
+            sf.write(audio_path, audio_data, sample_rate)
+            print(f"✅ Audio guardado: {nombre_archivo}")
+
+            # 3. Convertir el mismo array a sr.AudioData sin abrir el micrófono
+            audio_bytes = audio_data.tobytes()
+            audio_sr = sr.AudioData(audio_bytes, sample_rate, 2)  # 2 bytes = int16
+
+            # 4. Transcribir desde el objeto AudioData
+            try:
+                texto_reconocido = self.recognizer.recognize_google(
+                    audio_sr,
+                    language=Config.SPEECH_LANGUAGE
+                )
+                print(f"✅ Texto reconocido: {texto_reconocido}")
+            except sr.UnknownValueError:
+                print("⚠️ No se entendió el audio")
+            except sr.RequestError as e:
+                print(f"⚠️ Error en Google SR: {e}")
+
+        except Exception as e:
+            print(f"⚠️ Error en grabar_y_escuchar: {e}")
+            import traceback
+            traceback.print_exc()
+
         return (texto_reconocido, audio_path)
+    
+    def liberar_microfono(self):
+        """Libera el lock del micrófono forzadamente"""
+        if self.mic_lock.locked():
+            try:
+                self.mic_lock.release()
+                print("🔓 Micrófono liberado forzadamente")
+            except RuntimeError:
+                pass
     
     def detener(self):
         """Detener reproducción de audio"""

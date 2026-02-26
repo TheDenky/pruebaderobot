@@ -93,6 +93,7 @@ class PanelTerapeuta:
         # Iniciar escucha por voz si hay audio
         if self.audio:
             import threading
+            self._detener_escucha = threading.Event()
             self.hilo_escucha_admin = threading.Thread(
                 target=self._escuchar_comandos_voz,
                 daemon=True
@@ -107,31 +108,32 @@ class PanelTerapeuta:
         self.cargar_usuarios()
     
     def _escuchar_comandos_voz(self):
-        """Escuchar comandos de voz para salir del panel"""
         import time
-        
-        # ✅ Import FUERA del loop para detectar errores
         try:
             from chatopenai import detectar_salir_panel
         except Exception as e:
             print(f"❌ [Panel Admin] Error importando detectar_salir_panel: {e}")
             return
-        
+
         print("🎤 [Panel Admin] Escucha de voz iniciada")
         print("   Di 'salir' o 'cerrar' para salir del panel")
-        
-        while self.modo_admin_activo:
+
+        while self.modo_admin_activo and not self._detener_escucha.is_set():
+
+            # Verificar señal ANTES de tocar el micrófono
+            if self._detener_escucha.is_set():
+                break
+
             try:
                 print("🎤 [Panel Admin] Escuchando...")
-                
                 texto = self.audio.escuchar(timeout=2, phrase_time_limit=5)
-                
-                if not self.modo_admin_activo:
+
+                # Verificar señal DESPUÉS de escuchar
+                if self._detener_escucha.is_set():
                     break
-                
+
                 if texto:
                     print(f"🎤 [Panel Admin] Escuché: '{texto}'")
-                    
                     if detectar_salir_panel(texto):
                         print("🚪 [Panel Admin] Detectado comando de salida")
                         self.audio.hablar("Cerrando panel de administrador.")
@@ -139,14 +141,13 @@ class PanelTerapeuta:
                         break
                 else:
                     print("🎤 [Panel Admin] Silencio o timeout")
-            
+
             except Exception as e:
-                # ✅ Ahora SÍ muestra el error en lugar de ocultarlo
                 print(f"⚠️ [Panel Admin] Error en escucha: {e}")
                 time.sleep(1)
-            
+
             time.sleep(0.3)
-        
+
         print("🔇 [Panel Admin] Escucha finalizada")
     
     def _crear_header_moderno(self):
@@ -767,7 +768,7 @@ class PanelTerapeuta:
             
         except Exception as e:
             print(f"❌ Error al cargar usuarios: {e}")
-            messagebox.showerror("Error", f"No se pudieron cargar los usuarios:\n{e}")
+            messagebox.showerror("Error", f"No se pudieron cargar los usuarios:\n{e}", parent=self.ventana)
     
     def on_seleccionar_usuario(self, event):
         """Evento cuando se selecciona un usuario"""
@@ -1086,20 +1087,20 @@ class PanelTerapeuta:
     def cambiar_nivel(self):
         """Aplicar cambio de nivel"""
         if not self.persona_seleccionada:
-            messagebox.showwarning("Advertencia", "No hay paciente seleccionado")
+            messagebox.showwarning("Advertencia", "No hay paciente seleccionado", parent=self.ventana)
             return
         
         nuevo_nivel_nombre = self.widgets['combo_nivel'].get()
         
         if not nuevo_nivel_nombre:
-            messagebox.showwarning("Advertencia", "Selecciona un nivel")
+            messagebox.showwarning("Advertencia", "Selecciona un nivel", parent=self.ventana)
             return
         
         respuesta = messagebox.askyesno(
             "Confirmar cambio",
             f"¿Cambiar el nivel de {self.persona_seleccionada['name']}\n"
             f"de {self.persona_seleccionada['nivel_nombre']} a {nuevo_nivel_nombre}?"
-        )
+        , parent=self.ventana)
         
         if not respuesta:
             return
@@ -1121,21 +1122,21 @@ class PanelTerapeuta:
             
             self.cargar_usuarios()
             
-            messagebox.showinfo("Éxito", f"Nivel actualizado a {nuevo_nivel_nombre}")
+            messagebox.showinfo("Éxito", f"Nivel actualizado a {nuevo_nivel_nombre}", parent=self.ventana)
             
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo cambiar el nivel:\n{e}")
+            messagebox.showerror("Error", f"No se pudo cambiar el nivel:\n{e}", parent=self.ventana)
     
     def guardar_observaciones(self):
         """Guardar observaciones del terapeuta"""
         if not self.persona_seleccionada:
-            messagebox.showwarning("Advertencia", "No hay paciente seleccionado")
+            messagebox.showwarning("Advertencia", "No hay paciente seleccionado", parent=self.ventana)
             return
         
         observaciones = self.widgets['text_observaciones'].get("1.0", "end-1c").strip()
         
         if not observaciones:
-            messagebox.showwarning("Advertencia", "No hay observaciones para guardar")
+            messagebox.showwarning("Advertencia", "No hay observaciones para guardar", parent=self.ventana)
             return
         
         try:
@@ -1146,17 +1147,17 @@ class PanelTerapeuta:
             )
             
             if obs_id:
-                messagebox.showinfo("Éxito", "Observaciones guardadas correctamente")
+                messagebox.showinfo("Éxito", "Observaciones guardadas correctamente", parent=self.ventana)
             else:
                 raise Exception("No se pudo guardar")
             
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudieron guardar las observaciones:\n{e}")
+            messagebox.showerror("Error", f"No se pudieron guardar las observaciones:\n{e}", parent=self.ventana)
     
     def abrir_ventana_edicion(self):
         """Abrir ventana modal para editar información"""
         if not self.persona_seleccionada:
-            messagebox.showwarning("Advertencia", "No hay paciente seleccionado")
+            messagebox.showwarning("Advertencia", "No hay paciente seleccionado", parent=self.ventana)
             return
         
         # Crear ventana modal
@@ -1282,12 +1283,14 @@ class PanelTerapeuta:
             )
             
             if exito:
-                messagebox.showinfo("Éxito", "Información actualizada")
+                messagebox.showinfo("Éxito", "Información actualizada", parent=self.ventana)
                 ventana_modal.destroy()
+                self.ventana.lift()
+                self.ventana.focus_set()
                 self.cargar_detalles_usuario(self.persona_seleccionada['person_id'])
                 self.cargar_usuarios()
             else:
-                messagebox.showerror("Error", "No se pudo actualizar")
+                messagebox.showerror("Error", "No se pudo actualizar", parent=self.ventana)
         
         btn_guardar = tk.Button(
             frame_botones,
@@ -1320,26 +1323,35 @@ class PanelTerapeuta:
         btn_cancelar.pack(side='left', padx=5)
     
     def cerrar(self):
-        """Cerrar el panel"""
         print("\n🚪 Cerrando panel de administrador...")
         self.modo_admin_activo = False
-        
-        # ✅ Esperar que el hilo termine limpiamente
+
+        # 1. Señalizar al hilo que debe detenerse
+        if hasattr(self, '_detener_escucha'):
+            self._detener_escucha.set()
+            print("🔔 Señal de detención enviada al hilo")
+
+        # 2. Liberar el micrófono forzadamente
+        if hasattr(self, 'audio') and self.audio:
+            self.audio.liberar_microfono()
+
+        # 3. Esperar al hilo con timeout reducido
         if hasattr(self, 'hilo_escucha_admin') and self.hilo_escucha_admin.is_alive():
-            print("⏳ Esperando que el hilo de audio se libere...")
-            self.hilo_escucha_admin.join(timeout=6)
-            
+            print("⏳ Esperando que el hilo termine...")
+            self.hilo_escucha_admin.join(timeout=3)
+
             if self.hilo_escucha_admin.is_alive():
                 print("⚠️ El hilo tardó más de lo esperado")
             else:
-                print("✅ Hilo de audio liberado correctamente")
-                
+                print("✅ Hilo terminado correctamente")
+
+        # 4. Destruir ventana
         if self.ventana:
             try:
                 self.ventana.destroy()
             except:
                 pass
-        
+
         print("✅ Panel cerrado.\n")
     
     def mostrar(self):
